@@ -9,14 +9,14 @@ import (
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
 type IncomingJson struct {
 	Field1 string
-	Field2 string
-	Field3 string
+	Field2 int
+	Field3 float64
 }
 
 func jsonRequestHandler(data interface{}) ApiServers.JsonResponse {
 	var response ApiServers.JsonResponse
 
-	dataAsJson, ok := data.(IncomingJson)
+	dataAsJson, ok := data.(*IncomingJson)
 
 	if !ok {
 		response.Error = "Invalid Params"

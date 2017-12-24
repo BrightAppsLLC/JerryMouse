@@ -57,11 +57,27 @@ func helpers_LowLevelRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 	// Do JSON to Object Mapping
 	objectValue := reflect.ValueOf(handler.JsonObject).Elem()
 	for i := 0; i < objectValue.NumField(); i++ {
+		field := objectValue.Field(i)
 		fieldName := objectValue.Type().Field(i).Name
 
 		if valueToCopy, ok := jsonData[fieldName]; ok {
-			valueToCopyAsString := reflect.ValueOf(valueToCopy).String()
-			objectValue.Field(i).SetString(valueToCopyAsString)
+			if !field.CanInterface() {
+				continue
+			}
+			switch field.Interface().(type) {
+			case string:
+				valueToCopyAsString := reflect.ValueOf(valueToCopy).String()
+				objectValue.Field(i).SetString(valueToCopyAsString)
+				break
+			case int:
+				valueToCopyAsInt := int64(reflect.ValueOf(valueToCopy).Float())
+				objectValue.Field(i).SetInt(valueToCopyAsInt)
+				break
+			case float64:
+				valueToCopyAsFloat := reflect.ValueOf(valueToCopy).Float()
+				objectValue.Field(i).SetFloat(valueToCopyAsFloat)
+				break
+			}
 		}
 	}
 
