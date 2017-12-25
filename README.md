@@ -71,5 +71,17 @@ func main() {
 	})
 	apiServer.Run(":9999")
 }
+```
 
+##### Test with
+```shell
+curl localhost:9999 -H "Content-Type: application/json" -X POST -d '{"Field1": "value1", "Fieldd2": 1, "Field3": 0.1}'
+```
+
+```shell
+curl localhost:9999/SayHello -X GET
+```
+
+```shell
+curl localhost:9999/EchoBack  -X POST -d 'Helloooooooooooo'
 ```
