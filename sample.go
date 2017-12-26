@@ -2,22 +2,36 @@ package main
 
 import (
 	"io/ioutil"
+	"log"
 	"net/http"
 
-	"github.com/nic0lae/JerryMouse/ApiServers"
+	"github.com/nic0lae/JerryMouse/Servers"
 )
 
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
 // Define Handlers
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
+func sayHelloRequestHandler(rw http.ResponseWriter, r *http.Request) {
+	rw.Write([]byte("Hello !"))
+}
+
+func echoBackRequestHandler(rw http.ResponseWriter, r *http.Request) {
+	data, ok := ioutil.ReadAll(r.Body)
+	if ok != nil {
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+	} else {
+		rw.Write(data)
+	}
+}
+
 type IncomingJson struct {
 	Field1 string
 	Field2 int
 	Field3 float64
 }
 
-func jsonRequestHandler(data interface{}) ApiServers.JsonResponse {
-	var response ApiServers.JsonResponse
+func jsonRequestHandler(data interface{}) Servers.JsonResponse {
+	var response Servers.JsonResponse
 
 	dataAsJson, ok := data.(*IncomingJson)
 
@@ -33,16 +47,19 @@ func jsonRequestHandler(data interface{}) ApiServers.JsonResponse {
 	return response
 }
 
-func sayHelloRequestHandler(rw http.ResponseWriter, r *http.Request) {
-	rw.Write([]byte("Hello !"))
-}
+func streamTelemetryRequestHandler(inChannel chan []byte, outChannel chan []byte) {
+	// DOX:
+	// `close(outChannel)` will close the connection
+	// recieve err on `inChannel` means connection was closed
 
-func echoBackRequestHandler(rw http.ResponseWriter, r *http.Request) {
-	data, ok := ioutil.ReadAll(r.Body)
-	if ok != nil {
-		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-	} else {
-		rw.Write(data)
+	for {
+		data, ok := <-inChannel
+		if !ok {
+			// connection was closed
+			return
+		} else {
+			log.Print("data:", data)
+		}
 	}
 }
 
@@ -50,25 +67,35 @@ func echoBackRequestHandler(rw http.ResponseWriter, r *http.Request) {
 // Run Server
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
 func main() {
-	apiServer := ApiServers.HttpApi()
-	apiServer.SetJsonHandlers([]ApiServers.JsonHandler{
-		ApiServers.JsonHandler{
-			Route:      "/",
-			Handler:    jsonRequestHandler,
-			JsonObject: &IncomingJson{},
-		},
-	})
-	apiServer.SetLowLevelHandlers([]ApiServers.LowLevelHandler{
-		ApiServers.LowLevelHandler{
+	apiServer := Servers.Api()
+
+	apiServer.SetLowLevelHandlers([]Servers.LowLevelHandler{
+		Servers.LowLevelHandler{
 			Route:   "/SayHello",
 			Handler: sayHelloRequestHandler,
 			Verb:    "GET",
 		},
-		ApiServers.LowLevelHandler{
+		Servers.LowLevelHandler{
 			Route:   "/EchoBack",
 			Handler: echoBackRequestHandler,
 			Verb:    "POST",
 		},
 	})
+
+	apiServer.SetJsonHandlers([]Servers.JsonHandler{
+		Servers.JsonHandler{
+			Route:      "/",
+			Handler:    jsonRequestHandler,
+			JsonObject: &IncomingJson{},
+		},
+	})
+
+	apiServer.SetRealtimeHandlers([]Servers.RealtimeHandler{
+		Servers.RealtimeHandler{
+			Route:   "/StreamTelemetry",
+			Handler: streamTelemetryRequestHandler,
+		},
+	})
+
 	apiServer.Run(":9999")
 }

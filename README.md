@@ -3,8 +3,12 @@
 
 ### Build API Server
 ```go
-import "github.com/nic0lae/JerryMouse/ApiServers"
+import (
+	"io/ioutil"
+	"net/http"
 
+	"github.com/nic0lae/JerryMouse/Servers"
+)
 
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
 // Define Handlers
@@ -15,8 +19,8 @@ type IncomingJson struct {
 	Field3 float64
 }
 
-func jsonRequestHandler(data interface{}) ApiServers.JsonResponse {
-	var response ApiServers.JsonResponse
+func jsonRequestHandler(data interface{}) Servers.JsonResponse {
+	var response Servers.JsonResponse
 
 	dataAsJson, ok := data.(*IncomingJson)
 
@@ -49,21 +53,21 @@ func echoBackRequestHandler(rw http.ResponseWriter, r *http.Request) {
 // Run Server
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
 func main() {
-	apiServer := ApiServers.HttpApi()
-	apiServer.SetJsonHandlers([]ApiServers.JsonHandler{
-		ApiServers.JsonHandler{
+	apiServer := Servers.Api()
+	apiServer.SetJsonHandlers([]Servers.JsonHandler{
+		Servers.JsonHandler{
 			Route:      "/",
 			Handler:    jsonRequestHandler,
 			JsonObject: &IncomingJson{},
 		},
 	})
-	apiServer.SetLowLevelHandlers([]ApiServers.LowLevelHandler{
-		ApiServers.LowLevelHandler{
+	apiServer.SetLowLevelHandlers([]Servers.LowLevelHandler{
+		Servers.LowLevelHandler{
 			Route:   "/SayHello",
 			Handler: sayHelloRequestHandler,
 			Verb:    "GET",
 		},
-		ApiServers.LowLevelHandler{
+		Servers.LowLevelHandler{
 			Route:   "/EchoBack",
 			Handler: echoBackRequestHandler,
 			Verb:    "POST",
