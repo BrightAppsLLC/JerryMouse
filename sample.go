@@ -2,8 +2,8 @@ package main
 
 import (
 	"io/ioutil"
-	"log"
 	"net/http"
+	"time"
 
 	"github.com/nic0lae/JerryMouse/Servers"
 )
@@ -28,6 +28,7 @@ type IncomingJson struct {
 	Field1 string
 	Field2 int
 	Field3 float64
+	Field4 string
 }
 
 func jsonRequestHandler(data interface{}) Servers.JsonResponse {
@@ -47,20 +48,42 @@ func jsonRequestHandler(data interface{}) Servers.JsonResponse {
 	return response
 }
 
-func streamTelemetryRequestHandler(inChannel chan []byte, outChannel chan []byte) {
+func streamTelemetryRequestHandler(inChannel chan []byte, outChannel chan []byte, done chan bool) {
 	// DOX:
 	// `close(outChannel)` will close the connection
-	// recieve err on `inChannel` means connection was closed
+	// if error when reading on `inChannel` means connection was closed, do not send data
+	//
+	// whenever you feel like done, then write to the `done` once regardless
 
-	for {
-		data, ok := <-inChannel
-		if !ok {
-			// connection was closed
-			return
-		} else {
-			log.Print("data:", data)
+	go func() {
+		for {
+			data, ok := <-inChannel
+			if !ok {
+				done <- true
+				break
+			} else {
+				println("RECV: " + string(data))
+			}
 		}
-	}
+	}()
+
+	go func() {
+		for {
+			time.Sleep(1 * time.Second)
+
+			dataToSend := "Async Hi From Server @ " + time.Now().Format(time.RFC3339)
+
+			select {
+			case outChannel <- []byte(dataToSend):
+				// message sent - all looks ok
+				println("SEND: " + dataToSend)
+			default:
+				// message not sent - connection was closed")
+				done <- true
+				break
+			}
+		}
+	}()
 }
 
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
@@ -85,6 +108,11 @@ func main() {
 	apiServer.SetJsonHandlers([]Servers.JsonHandler{
 		Servers.JsonHandler{
 			Route:      "/",
+			Handler:    jsonRequestHandler,
+			JsonObject: &IncomingJson{},
+		},
+		Servers.JsonHandler{
+			Route:      "/MyRestEndopint",
 			Handler:    jsonRequestHandler,
 			JsonObject: &IncomingJson{},
 		},

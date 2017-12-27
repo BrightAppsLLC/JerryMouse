@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -55,7 +56,7 @@ func (has ApiServer) Run(ipPort string) {
 	realtimeRouteToHandler = map[string]RealtimeHandler{}
 	for _, handler := range has.realtimeHandlers {
 		realtimeRouteToHandler[handler.Route] = handler
-		router.HandleFunc(handler.Route, helpers_LowLevelRequestDelegate).Methods("POST")
+		router.HandleFunc(handler.Route, helpers_RealtimeRequestDelegate)
 	}
 
 	log.Fatal(http.ListenAndServe(ipPort, router))
@@ -101,6 +102,8 @@ func helpers_LowLevelRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 }
 
 func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
+	r.Header["Origin"] = nil
+
 	var handler RealtimeHandler = realtimeRouteToHandler[r.URL.Path]
 
 	var upgrader = websocket.Upgrader{}
@@ -108,12 +111,23 @@ func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Print("upgrade: ", err)
 	}
-	defer ws.Close()
 
 	var inputChannel = make(chan []byte)
 	var outputChannel = make(chan []byte)
+	var doneChannel = make(chan bool)
+
+	var once sync.Once
+	closeInputChannel := func() {
+		close(inputChannel)
+		// close(outputChannel)
+	}
 
 	// GO channel DOX: senders close; receivers check for closed.
+
+	go func() {
+		<-doneChannel
+		once.Do(closeInputChannel)
+	}()
 
 	go func() {
 		for {
@@ -125,14 +139,13 @@ func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 			} else {
 				err = ws.WriteMessage(websocket.TextMessage, data)
 				if err != nil {
-					log.Print("write:", err) // TODO: LOG
+					log.Print("WebSocket-Write-Error:", err) // TODO: LOG
 
 					// we can't write means connection is closed, meaans we have to close chanels
-					close(inputChannel)
+					once.Do(closeInputChannel)
 					break
 				}
 			}
-
 		}
 	}()
 
@@ -140,10 +153,10 @@ func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 		for {
 			_, data, err := ws.ReadMessage()
 			if err != nil {
-				log.Println("read:", err) // TODO: LOG
+				log.Println("WebSocket-Read-Error: ", err) // TODO: LOG
 
-				// we can't write means connection is closed, meaans we have to close chanels
-				close(inputChannel)
+				// we can't read means connection is closed, meaans we have to close chanels
+				once.Do(closeInputChannel)
 				break
 			}
 
@@ -151,7 +164,7 @@ func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	handler.Handler(inputChannel, outputChannel)
+	go handler.Handler(inputChannel, outputChannel, doneChannel)
 }
 
 // func helpers_LowLevelRequestDelegate2(rw http.ResponseWriter, r *http.Request) {
