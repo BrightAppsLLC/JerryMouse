@@ -123,20 +123,13 @@ func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 
 	var inputChannel = make(chan []byte)
 	var outputChannel = make(chan []byte)
-	var doneChannel = make(chan bool)
 
 	var once sync.Once
 	closeInputChannel := func() {
 		close(inputChannel)
-		// close(outputChannel)
 	}
 
 	// GO channel DOX: senders close; receivers check for closed.
-
-	go func() {
-		<-doneChannel
-		once.Do(closeInputChannel)
-	}()
 
 	go func() {
 		for {
@@ -144,16 +137,19 @@ func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 			if !ok {
 				// `outputChannel` from hook closed, means we have to close connection
 				ws.Close()
-				break
-			} else {
-				err = ws.WriteMessage(websocket.TextMessage, data)
-				if err != nil {
-					log.Print("WebSocket-Write-Error:", err) // TODO: LOG
+				return
+			}
 
-					// we can't write means connection is closed, meaans we have to close chanels
-					once.Do(closeInputChannel)
-					break
-				}
+			err = ws.WriteMessage(websocket.TextMessage, data)
+			if err != nil {
+				// TRACE
+				// if false {
+				// log.Print("WebSocket-Write-Error:", err) // TODO: LOG
+				// }
+
+				// we can't write means connection is closed, meaans we have to close chanels
+				once.Do(closeInputChannel)
+				return
 			}
 		}
 	}()
@@ -162,18 +158,21 @@ func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 		for {
 			_, data, err := ws.ReadMessage()
 			if err != nil {
-				log.Println("WebSocket-Read-Error: ", err) // TODO: LOG
+				// TRACE
+				// if false {
+				// log.Println("WebSocket-Read-Error: ", err) // TODO: LOG
+				// }
 
 				// we can't read means connection is closed, meaans we have to close chanels
 				once.Do(closeInputChannel)
-				break
+				return
 			}
 
 			inputChannel <- data
 		}
 	}()
 
-	go handler.Handler(inputChannel, outputChannel, doneChannel)
+	go handler.Handler(inputChannel, outputChannel) //, doneChannel)
 }
 
 // func helpers_LowLevelRequestDelegate2(rw http.ResponseWriter, r *http.Request) {

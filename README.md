@@ -49,18 +49,16 @@ func jsonRequestHandler(data interface{}) Servers.JsonResponse {
 	return response
 }
 
-func streamTelemetryRequestHandler(inChannel chan []byte, outChannel chan []byte, done chan bool) {
+func streamTelemetryRequestHandler(inChannel chan []byte, outChannel chan []byte) { //, done chan bool) {
 	// DOX:
 	// `close(outChannel)` will close the connection
 	// if error when reading on `inChannel` means connection was closed, do not send data
-	//
-	// whenever you feel like done, then write to the `done` once regardless
 
 	go func() {
 		for {
 			data, ok := <-inChannel
 			if !ok {
-				done <- true
+				close(outChannel)
 				break
 			} else {
 				println("RECV: " + string(data))
@@ -80,7 +78,7 @@ func streamTelemetryRequestHandler(inChannel chan []byte, outChannel chan []byte
 				println("SEND: " + dataToSend)
 			default:
 				// message not sent - connection was closed")
-				done <- true
+				close(outChannel)
 				break
 			}
 		}
