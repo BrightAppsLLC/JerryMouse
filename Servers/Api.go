@@ -59,6 +59,9 @@ func (has ApiServer) Run(ipPort string) {
 		router.HandleFunc(handler.Route, helpers_RealtimeRequestDelegate)
 	}
 
+	// TRACE
+	// fmt.Println(fmt.Sprintf("%s -> Ready.", Utils.CallStack()))
+
 	log.Fatal(http.ListenAndServe(ipPort, router))
 }
 
@@ -68,6 +71,12 @@ func helpers_LowLevelRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 	// Get JSON fields
 	var jsonData JsonData
 	_ = json.NewDecoder(r.Body).Decode(&jsonData)
+
+	// TRACE
+	// if false {
+	// 	reqAsJSON, _ := json.Marshal(req)
+	// 	fmt.Println(fmt.Sprintf("%s -> %s", Utils.CallStack(), string(reqAsJSON)))
+	// }
 
 	// Do JSON to Object Mapping
 	objectValue := reflect.ValueOf(handler.JsonObject).Elem()

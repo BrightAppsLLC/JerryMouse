@@ -32,18 +32,14 @@ type IncomingJson struct {
 }
 
 func jsonRequestHandler(data interface{}) Servers.JsonResponse {
-	var response Servers.JsonResponse
-
 	dataAsJson, ok := data.(*IncomingJson)
-
 	if !ok {
-		response.Error = "Invalid Params"
-		response.Data = dataAsJson
-	} else {
-		// Process & Set Fields
-		response.Error = ""
-		response.Data = dataAsJson
+		return Servers.JsonResponse{Error: "Invalid Params"}
 	}
+
+	// Input params seem ok, Process & Set Fields
+	var response Servers.JsonResponse
+	response.Data = dataAsJson
 
 	return response
 }
