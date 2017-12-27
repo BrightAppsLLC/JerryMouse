@@ -134,9 +134,9 @@ func main() {
 }
 ```
 
-##### Test with
+##### Test With
 ```shell
-curl localhost:9999 -H "Content-Type: application/json" -X POST -d '{"Field1": "value1", "Fieldd2": 1, "Field3": 0.1}'
+curl localhost:9999 -H "Content-Type: application/json" -X POST -d '{"Field1": "value1", "Fieldd2": 1, "Field3": 0.1, "Field4": "another string"}'
 ```
 
 ```shell
@@ -146,3 +146,6 @@ curl localhost:9999/SayHello -X GET
 ```shell
 curl localhost:9999/EchoBack  -X POST -d 'Helloooooooooooo'
 ```
+
+For the WebSockets example, open the `sample.html` page
+
