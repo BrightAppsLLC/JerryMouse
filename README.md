@@ -1,7 +1,7 @@
 
 ### ![](https://raw.github.com/nic0lae/JerryMouse/master/logo.png)
 
-### Build API Server
+### Build API Servers
 ```go
 package main
 
