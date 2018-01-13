@@ -37,3 +37,8 @@ type ApiServer struct {
 	jsonHandlers     []JsonHandler
 	realtimeHandlers []RealtimeHandler
 }
+
+type RealtimeClient struct {
+	Address string
+	Peers   []string
+}

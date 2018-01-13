@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 	"reflect"
 	"sync"
 
@@ -33,8 +34,15 @@ func (has *ApiServer) SetRealtimeHandlers(handlers []RealtimeHandler) {
 	has.realtimeHandlers = handlers
 }
 
+func (has *ApiServer) SendToAllRealtimePeers(data []byte) {
+	for _, conn := range realtimePeers {
+		conn.WriteMessage(websocket.TextMessage, data)
+	}
+}
+
 var jsonRouteToHandler map[string]JsonHandler
 var realtimeRouteToHandler map[string]RealtimeHandler
+var realtimePeers []*websocket.Conn
 
 // Run - Runs ApiServer
 func (has ApiServer) Run(ipPort string) {
@@ -54,6 +62,7 @@ func (has ApiServer) Run(ipPort string) {
 
 	// Realtime
 	realtimeRouteToHandler = map[string]RealtimeHandler{}
+	realtimePeers = []*websocket.Conn{}
 	for _, handler := range has.realtimeHandlers {
 		realtimeRouteToHandler[handler.Route] = handler
 		router.HandleFunc(handler.Route, helpers_RealtimeRequestDelegate)
@@ -78,36 +87,24 @@ func helpers_LowLevelRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 	// 	fmt.Println(fmt.Sprintf("%s -> %s", Utils.CallStack(), string(reqAsJSON)))
 	// }
 
-	// Do JSON to Object Mapping
-	objectValue := reflect.ValueOf(handler.JsonObject).Elem()
-	for i := 0; i < objectValue.NumField(); i++ {
-		field := objectValue.Field(i)
-		fieldName := objectValue.Type().Field(i).Name
-
-		if valueToCopy, ok := jsonData[fieldName]; ok {
-			if !field.CanInterface() {
-				continue
-			}
-			switch field.Interface().(type) {
-			case string:
-				valueToCopyAsString := reflect.ValueOf(valueToCopy).String()
-				objectValue.Field(i).SetString(valueToCopyAsString)
-				break
-			case int:
-				valueToCopyAsInt := int64(reflect.ValueOf(valueToCopy).Float())
-				objectValue.Field(i).SetInt(valueToCopyAsInt)
-				break
-			case float64:
-				valueToCopyAsFloat := reflect.ValueOf(valueToCopy).Float()
-				objectValue.Field(i).SetFloat(valueToCopyAsFloat)
-				break
-			}
-		}
-	}
+	jsonData.ToObject(handler.JsonObject)
 
 	// Pass Object
 	var response JsonResponse = handler.Handler(handler.JsonObject)
 	json.NewEncoder(rw).Encode(response)
+}
+
+func helpers_RemoveRealtimePeer(peer *websocket.Conn) {
+	index := -1
+	for i, conn := range realtimePeers {
+		if conn == peer {
+			index = i
+			break
+		}
+	}
+	if index != -1 {
+		realtimePeers = append(realtimePeers[:index], realtimePeers[index+1:]...)
+	}
 }
 
 func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
@@ -119,8 +116,15 @@ func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(rw, r, nil) // Upgrade the connection to a websocket
 	if err != nil {
 		log.Print("upgrade: ", err)
+		return
 	}
 
+	realtimePeers = append(realtimePeers, ws)
+
+	helpers_RealtimeCommunicationHandler(ws, &handler)
+}
+
+func helpers_RealtimeCommunicationHandler(ws *websocket.Conn, handler *RealtimeHandler) {
 	var inputChannel = make(chan []byte)
 	var outputChannel = make(chan []byte)
 
@@ -137,10 +141,11 @@ func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 			if !ok {
 				// `outputChannel` from hook closed, means we have to close connection
 				ws.Close()
+				helpers_RemoveRealtimePeer(ws)
 				return
 			}
 
-			err = ws.WriteMessage(websocket.TextMessage, data)
+			err := ws.WriteMessage(websocket.TextMessage, data)
 			if err != nil {
 				// TRACE
 				// if false {
@@ -193,3 +198,55 @@ func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 // 	rw.Write(responseAsByteArray)
 // 	// json.NewEncoder(rw).Encode(responseAsByteArray)
 // }
+
+// ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
+// WS Client
+// ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
+
+func NewRealtimeClient() *RealtimeClient {
+	return &RealtimeClient{
+		Address: "",
+		Peers:   []string{},
+	}
+}
+
+func (rtc *RealtimeClient) ConnectToPeer(url url.URL, realtimeHandler *RealtimeHandler) {
+	c, _, err := websocket.DefaultDialer.Dial(url.String(), nil)
+	if err != nil {
+		log.Fatal("dial:", err)
+	}
+
+	helpers_RealtimeCommunicationHandler(c, realtimeHandler)
+}
+
+// ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
+// JSON Helpers
+// ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
+func (jsonData *JsonData) ToObject(objectInstance interface{}) {
+	// Do JSON to Object Mapping
+	objectValue := reflect.ValueOf(objectInstance).Elem()
+	for i := 0; i < objectValue.NumField(); i++ {
+		field := objectValue.Field(i)
+		fieldName := objectValue.Type().Field(i).Name
+
+		if valueToCopy, ok := (*jsonData)[fieldName]; ok {
+			if !field.CanInterface() {
+				continue
+			}
+			switch field.Interface().(type) {
+			case string:
+				valueToCopyAsString := reflect.ValueOf(valueToCopy).String()
+				objectValue.Field(i).SetString(valueToCopyAsString)
+				break
+			case int:
+				valueToCopyAsInt := int64(reflect.ValueOf(valueToCopy).Float())
+				objectValue.Field(i).SetInt(valueToCopyAsInt)
+				break
+			case float64:
+				valueToCopyAsFloat := reflect.ValueOf(valueToCopy).Float()
+				objectValue.Field(i).SetFloat(valueToCopyAsFloat)
+				break
+			}
+		}
+	}
+}
