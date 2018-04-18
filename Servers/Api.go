@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"reflect"
 	"sync"
-
+	"io/ioutil"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
@@ -78,8 +78,8 @@ func helpers_LowLevelRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 	var handler JsonHandler = jsonRouteToHandler[r.URL.Path]
 
 	// Get JSON fields
-	var jsonData JsonData
-	_ = json.NewDecoder(r.Body).Decode(&jsonData)
+	//var jsonData JsonData
+	//_ = json.NewDecoder(r.Body).Decode(&jsonData)
 
 	// TRACE
 	// if false {
@@ -87,10 +87,19 @@ func helpers_LowLevelRequestDelegate(rw http.ResponseWriter, r *http.Request) {
 	// 	fmt.Println(fmt.Sprintf("%s -> %s", Utils.CallStack(), string(reqAsJSON)))
 	// }
 
-	jsonData.ToObject(handler.JsonObject)
+	//jsonData.ToObject(handler.JsonObject)
 
 	// Pass Object
-	var response JsonResponse = handler.Handler(handler.JsonObject)
+	//var response JsonResponse = handler.Handler(handler.JsonObject)
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error reading body: %v", err)
+		http.Error(rw, "can't read body", http.StatusBadRequest)
+		return
+	}
+
+	var response JsonResponse = handler.Handler(body)
+	//var response JsonResponse = handler.Handler(jsonData)
 	json.NewEncoder(rw).Encode(response)
 }
 
@@ -246,6 +255,7 @@ func (jsonData *JsonData) ToObject(objectInstance interface{}) {
 				valueToCopyAsFloat := reflect.ValueOf(valueToCopy).Float()
 				objectValue.Field(i).SetFloat(valueToCopyAsFloat)
 				break
+			default:
 			}
 		}
 	}

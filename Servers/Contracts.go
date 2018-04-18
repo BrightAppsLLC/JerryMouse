@@ -5,7 +5,9 @@ import (
 )
 
 type LowLevelRequestHandler func(rw http.ResponseWriter, r *http.Request)
-type JsonRequestHandler func(data interface{}) JsonResponse
+//type JsonRequestHandler func(data interface{}) JsonResponse
+type JsonRequestHandler func(data []byte) JsonResponse
+
 type RealtimeRequestHandler func(inChannel chan []byte, outChannel chan []byte)
 
 type LowLevelHandler struct {
