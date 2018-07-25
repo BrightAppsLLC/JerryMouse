@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -40,6 +41,21 @@ func jsonRequestHandler(data interface{}) Servers.JsonResponse {
 	// Input params seem ok, Process & Set Fields
 	var response Servers.JsonResponse
 	response.Data = dataAsJson
+
+	return response
+}
+
+func jsonRequestHandler2(data []byte) Servers.JsonResponse {
+	var incomingJson = IncomingJson{}
+
+	ok := json.Unmarshal(data, incomingJson)
+	if ok != nil {
+		return Servers.JsonResponse{Error: "Invalid Params"}
+	}
+
+	// Input params seem ok, Process & Set Fields
+	var response Servers.JsonResponse
+	response.Data = incomingJson
 
 	return response
 }
@@ -102,12 +118,12 @@ func main() {
 	apiServer.SetJsonHandlers([]Servers.JsonHandler{
 		Servers.JsonHandler{
 			Route:      "/",
-			Handler:    jsonRequestHandler,
+			Handler:    jsonRequestHandler2,
 			JsonObject: &IncomingJson{},
 		},
 		Servers.JsonHandler{
 			Route:      "/MyRestEndopint",
-			Handler:    jsonRequestHandler,
+			Handler:    jsonRequestHandler2,
 			JsonObject: &IncomingJson{},
 		},
 	})
