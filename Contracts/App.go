@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/nic0lae/JerryMouse/Contracts"
+	"github.com/TheFlyingNomad/JerryMouse/Contracts"
 )
 
 // RenderTemplate -
