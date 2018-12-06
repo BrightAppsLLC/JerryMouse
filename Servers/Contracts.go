@@ -5,6 +5,7 @@ import (
 )
 
 type LowLevelRequestHandler func(rw http.ResponseWriter, r *http.Request)
+
 //type JsonRequestHandler func(data interface{}) JsonResponse
 type JsonRequestHandler func(data []byte) JsonResponse
 
@@ -38,6 +39,7 @@ type ApiServer struct {
 	lowLevelHandlers []LowLevelHandler
 	jsonHandlers     []JsonHandler
 	realtimeHandlers []RealtimeHandler
+	shouldEnableCors bool
 }
 
 type RealtimeClient struct {

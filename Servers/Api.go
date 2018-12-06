@@ -2,14 +2,16 @@ package Servers
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"reflect"
 	"sync"
-	"io/ioutil"
+
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/rs/cors"
 )
 
 // Api - Creates a new ApiServer
@@ -17,6 +19,7 @@ func Api() *ApiServer {
 	return &ApiServer{
 		lowLevelHandlers: []LowLevelHandler{},
 		jsonHandlers:     []JsonHandler{},
+		shouldEnableCors: false,
 	}
 }
 
@@ -38,6 +41,10 @@ func (has *ApiServer) SendToAllRealtimePeers(data []byte) {
 	for _, conn := range realtimePeers {
 		conn.WriteMessage(websocket.TextMessage, data)
 	}
+}
+
+func (has *ApiServer) EnableCORS() {
+	has.shouldEnableCors = true
 }
 
 var jsonRouteToHandler map[string]JsonHandler
@@ -71,7 +78,12 @@ func (has ApiServer) Run(ipPort string) {
 	// TRACE
 	// fmt.Println(fmt.Sprintf("%s -> Ready.", Utils.CallStack()))
 
-	log.Fatal(http.ListenAndServe(ipPort, router))
+	if has.shouldEnableCors {
+		corsSetterHandler := cors.Default().Handler(router)
+		log.Fatal(http.ListenAndServe(ipPort, corsSetterHandler))
+	} else {
+		log.Fatal(http.ListenAndServe(ipPort, router))
+	}
 }
 
 func helpers_LowLevelRequestDelegate(rw http.ResponseWriter, r *http.Request) {
