@@ -24,8 +24,8 @@ type JsonHandler struct {
 }
 
 type JsonResponse struct {
-	Error string `json:"Error"`
-	Data  interface{}
+	Error string      `json:"error,omitempty"`
+	Data  interface{} `json:"data,omitempty"`
 }
 
 type JsonData map[string]interface{}
