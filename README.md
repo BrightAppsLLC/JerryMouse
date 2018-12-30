@@ -1,5 +1,5 @@
 
-### ![](https://raw.github.com/TheFlyingNomad/JerryMouse/master/logo.png)
+### ![](https://raw.github.com/codemodify/JerryMouse/master/logo.png)
 
 ### Build API Servers
 ```go
@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TheFlyingNomad/JerryMouse/Servers"
+	"github.com/codemodify/JerryMouse/Servers"
 )
 
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~

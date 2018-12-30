@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TheFlyingNomad/JerryMouse/Servers"
+	"github.com/codemodify/JerryMouse/Servers"
 )
 
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
