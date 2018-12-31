@@ -1,4 +1,4 @@
-package Contracts
+package clients
 
 import (
 	"fmt"

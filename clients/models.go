@@ -1,14 +1,8 @@
-package Contracts
+package clients
 
 import (
-	"html/template"
-
-	"github.com/IsomorphicGo/isokit"
 	"honnef.co/go/js/dom"
 )
-
-// EmptyObject -
-type EmptyObject struct{}
 
 // ClientAppContext -
 type ClientAppContext struct {
@@ -16,10 +10,4 @@ type ClientAppContext struct {
 	Window               dom.Window
 	Document             dom.Document
 	PageContentContainer dom.Element
-}
-
-// ServerAppContext -
-type ServerAppContext struct {
-	Templates   *template.Template
-	TemplateSet *isokit.TemplateSet
 }
