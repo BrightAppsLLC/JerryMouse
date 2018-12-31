@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 )
 
@@ -28,33 +29,18 @@ type JSONHandler struct {
 // JSONServer -
 type JSONServer struct {
 	handlers       []JSONHandler
-	enableCors     bool
 	routeToHandler map[string]JSONHandler
-	lowLevelServer *LowLevelServer
+	lowLevelServer IServer
 }
 
 // NewJSONServer -
-func NewJSONServer() *JSONServer {
-	return &JSONServer{
-		handlers:       []JSONHandler{},
-		enableCors:     false,
+func NewJSONServer(enableCORS bool, handlers []JSONHandler) *JSONServer {
+
+	var thisRef = &JSONServer{
+		handlers:       handlers,
 		routeToHandler: map[string]JSONHandler{},
-		lowLevelServer: NewLowLevelServer(),
+		lowLevelServer: nil,
 	}
-}
-
-// SetHandlers -
-func (thisRef *JSONServer) SetHandlers(handlers []JSONHandler) {
-	thisRef.handlers = handlers
-}
-
-// EnableCORS -
-func (thisRef *JSONServer) EnableCORS() {
-	thisRef.lowLevelServer.EnableCORS()
-}
-
-// Run - Server interface
-func (thisRef *JSONServer) Run(ipPort string) {
 
 	var lowLevelRequestHelper = func(rw http.ResponseWriter, r *http.Request) {
 		var jsonHandler = thisRef.routeToHandler[r.URL.Path]
@@ -83,8 +69,19 @@ func (thisRef *JSONServer) Run(ipPort string) {
 		})
 	}
 
-	thisRef.lowLevelServer.SetHandlers(lowLevelHandlers)
-	thisRef.lowLevelServer.Run(ipPort)
+	thisRef.lowLevelServer = NewLowLevelServer(enableCORS, lowLevelHandlers)
+
+	return thisRef
+}
+
+// Run - Server interface
+func (thisRef *JSONServer) Run(ipPort string) error {
+	return thisRef.lowLevelServer.Run(ipPort)
+}
+
+// RunOnExistingListener -
+func (thisRef *JSONServer) RunOnExistingListener(listener net.Listener) {
+	thisRef.lowLevelServer.RunOnExistingListener(listener)
 }
 
 // func (jsonData *JsonData) ToObject(objectInstance interface{}) {

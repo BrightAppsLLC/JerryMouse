@@ -1,282 +1,194 @@
 package servers
 
-// import (
-// 	"encoding/json"
-// 	"io/ioutil"
-// 	"log"
-// 	"net/http"
-// 	"net/url"
-// 	"reflect"
-// 	"sync"
+import (
+	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"sync"
 
-// 	"github.com/gorilla/mux"
-// 	"github.com/gorilla/websocket"
-// 	"github.com/rs/cors"
-// )
+	"github.com/gorilla/websocket"
+)
 
-// // JSONApiServer -
-// type JSONApiServer struct {
-// 	lowLevelHandlers []LowLevelHandler
-// 	jsonHandlers     []JsonHandler
-// 	realtimeHandlers []RealtimeHandler
-// 	shouldEnableCors bool
-// }
+// RealtimeRequestHandler -
+type RealtimeRequestHandler func(inChannel chan []byte, outChannel chan []byte)
 
-// // NewJSONApiServer -
-// func NewJSONApiServer() *JSONApiServer {
-// 	return &JSONApiServer{
-// 		lowLevelHandlers: []LowLevelHandler{},
-// 		jsonHandlers:     []JsonHandler{},
-// 		shouldEnableCors: false,
-// 	}
-// }
+// RealtimeHandler -
+type RealtimeHandler struct {
+	Route   string
+	Handler RealtimeRequestHandler
+}
 
-// // SetLowLevelHandlers - Sets JSONApiServer handlers
-// func (has *JSONApiServer) SetLowLevelHandlers(handlers []LowLevelHandler) {
-// 	has.lowLevelHandlers = handlers
-// }
+// RealtimeClient -
+type RealtimeClient struct {
+	Address string
+	Peers   []string
+}
 
-// // SetJsonHandlers - Sets JSONApiServer handlers
-// func (has *JSONApiServer) SetJsonHandlers(handlers []JsonHandler) {
-// 	has.jsonHandlers = handlers
-// }
+// RealtimeServer -
+type RealtimeServer struct {
+	handlers       []RealtimeHandler
+	routeToHandler map[string]RealtimeHandler
+	lowLevelServer IServer
+	peers          []*websocket.Conn
+	peersSync      sync.RWMutex
+}
 
-// func (has *JSONApiServer) SetRealtimeHandlers(handlers []RealtimeHandler) {
-// 	has.realtimeHandlers = handlers
-// }
+// NewRealtimeServer -
+func NewRealtimeServer(enableCORS bool, handlers []RealtimeHandler) IServer {
 
-// func (has *JSONApiServer) SendToAllRealtimePeers(data []byte) {
-// 	for _, conn := range realtimePeers {
-// 		conn.WriteMessage(websocket.TextMessage, data)
-// 	}
-// }
+	var thisRef = &RealtimeServer{
+		handlers:       handlers,
+		routeToHandler: map[string]RealtimeHandler{},
+		lowLevelServer: nil,
+		peers:          []*websocket.Conn{},
+		peersSync:      sync.RWMutex{},
+	}
 
-// func (has *JSONApiServer) EnableCORS() {
-// 	has.shouldEnableCors = true
-// }
+	var lowLevelRequestHelper = func(rw http.ResponseWriter, r *http.Request) {
+		r.Header["Origin"] = nil
 
-// var jsonRouteToHandler map[string]JsonHandler
-// var realtimeRouteToHandler map[string]RealtimeHandler
-// var realtimePeers []*websocket.Conn
+		var handler RealtimeHandler = thisRef.routeToHandler[r.URL.Path]
 
-// // Run - Runs JSONApiServer
-// func (has JSONApiServer) Run(ipPort string) {
-// 	router := mux.NewRouter()
+		var upgrader = websocket.Upgrader{}
+		ws, err := upgrader.Upgrade(rw, r, nil)
+		if err != nil {
+			log.Print("upgrade: ", err)
+			return
+		}
 
-// 	// Low level
-// 	for _, handler := range has.lowLevelHandlers {
-// 		router.HandleFunc(handler.Route, handler.Handler).Methods(handler.Verb)
-// 	}
+		thisRef.setupCommunication(ws, &handler)
+	}
 
-// 	// JSON
-// 	jsonRouteToHandler = map[string]JsonHandler{}
-// 	for _, handler := range has.jsonHandlers {
-// 		jsonRouteToHandler[handler.Route] = handler
-// 		router.HandleFunc(handler.Route, helpers_LowLevelRequestDelegate).Methods("POST")
-// 	}
+	var lowLevelHandlers = []LowLevelHandler{}
 
-// 	// Realtime
-// 	realtimeRouteToHandler = map[string]RealtimeHandler{}
-// 	realtimePeers = []*websocket.Conn{}
-// 	for _, handler := range has.realtimeHandlers {
-// 		realtimeRouteToHandler[handler.Route] = handler
-// 		router.HandleFunc(handler.Route, helpers_RealtimeRequestDelegate)
-// 	}
+	for _, handler := range thisRef.handlers {
+		thisRef.routeToHandler[handler.Route] = handler
 
-// 	// TRACE
-// 	// fmt.Println(fmt.Sprintf("%s -> Ready.", Utils.CallStack()))
+		lowLevelHandlers = append(lowLevelHandlers, LowLevelHandler{
+			Route:   handler.Route,
+			Handler: lowLevelRequestHelper,
+			Verb:    "GET",
+		})
+	}
 
-// 	if has.shouldEnableCors {
-// 		corsSetterHandler := cors.Default().Handler(router)
-// 		log.Fatal(http.ListenAndServe(ipPort, corsSetterHandler))
-// 	} else {
-// 		log.Fatal(http.ListenAndServe(ipPort, router))
-// 	}
-// }
+	thisRef.lowLevelServer = NewLowLevelServer(enableCORS, lowLevelHandlers)
 
-// func helpers_LowLevelRequestDelegate(rw http.ResponseWriter, r *http.Request) {
-// 	var handler JsonHandler = jsonRouteToHandler[r.URL.Path]
+	return thisRef
+}
 
-// 	// Get JSON fields
-// 	//var jsonData JsonData
-// 	//_ = json.NewDecoder(r.Body).Decode(&jsonData)
+// Run -
+func (thisRef *RealtimeServer) Run(ipPort string) error {
+	return thisRef.lowLevelServer.Run(ipPort)
+}
 
-// 	// TRACE
-// 	// if false {
-// 	// 	reqAsJSON, _ := json.Marshal(req)
-// 	// 	fmt.Println(fmt.Sprintf("%s -> %s", Utils.CallStack(), string(reqAsJSON)))
-// 	// }
+// RunOnExistingListener -
+func (thisRef *RealtimeServer) RunOnExistingListener(listener net.Listener) {
+	thisRef.lowLevelServer.RunOnExistingListener(listener)
+}
 
-// 	//jsonData.ToObject(handler.JsonObject)
+func (thisRef *RealtimeServer) setupCommunication(ws *websocket.Conn, handler *RealtimeHandler) {
+	thisRef.addPeer(ws)
 
-// 	// Pass Object
-// 	//var response JsonResponse = handler.Handler(handler.JsonObject)
-// 	body, err := ioutil.ReadAll(r.Body)
-// 	if err != nil {
-// 		log.Printf("Error reading body: %v", err)
-// 		http.Error(rw, "can't read body", http.StatusBadRequest)
-// 		return
-// 	}
+	var inChannel = make(chan []byte)
+	var outChannel = make(chan []byte)
 
-// 	var response JsonResponse = handler.Handler(body)
-// 	//var response JsonResponse = handler.Handler(jsonData)
-// 	json.NewEncoder(rw).Encode(response)
-// }
+	var once sync.Once
+	closeInChannel := func() {
+		close(inChannel)
+	}
 
-// func helpers_RemoveRealtimePeer(peer *websocket.Conn) {
-// 	index := -1
-// 	for i, conn := range realtimePeers {
-// 		if conn == peer {
-// 			index = i
-// 			break
-// 		}
-// 	}
-// 	if index != -1 {
-// 		realtimePeers = append(realtimePeers[:index], realtimePeers[index+1:]...)
-// 	}
-// }
+	var wg sync.WaitGroup
 
-// func helpers_RealtimeRequestDelegate(rw http.ResponseWriter, r *http.Request) {
-// 	r.Header["Origin"] = nil
+	// outChannel -> PEER
+	wg.Add(1)
+	go func() {
+		fmt.Println("AAAAAAAA - START")
 
-// 	var handler RealtimeHandler = realtimeRouteToHandler[r.URL.Path]
+		for {
+			data, readOk := <-outChannel
+			if !readOk {
+				break
+			}
 
-// 	var upgrader = websocket.Upgrader{}
-// 	ws, err := upgrader.Upgrade(rw, r, nil) // Upgrade the connection to a websocket
-// 	if err != nil {
-// 		log.Print("upgrade: ", err)
-// 		return
-// 	}
+			err := ws.WriteMessage(websocket.TextMessage, data)
+			if err != nil {
+				break
+			}
+		}
 
-// 	realtimePeers = append(realtimePeers, ws)
+		fmt.Println("AAAAAAAA - END")
+		once.Do(closeInChannel)
+		wg.Done()
+	}()
 
-// 	helpers_RealtimeCommunicationHandler(ws, &handler)
-// }
+	// PEER  -> inChannel
+	wg.Add(1)
+	go func() {
+		fmt.Println("BBBBBBBB - START")
 
-// func helpers_RealtimeCommunicationHandler(ws *websocket.Conn, handler *RealtimeHandler) {
-// 	var inputChannel = make(chan []byte)
-// 	var outputChannel = make(chan []byte)
+		for {
+			_, data, err := ws.ReadMessage()
+			if err != nil {
+				break
+			}
 
-// 	var once sync.Once
-// 	closeInputChannel := func() {
-// 		close(inputChannel)
-// 	}
+			var haveToStop = false
+			select {
+			case inChannel <- []byte(data):
+			default:
+				haveToStop = true
+				break
+			}
 
-// 	// GO channel DOX: senders close; receivers check for closed.
+			if haveToStop {
+				break
+			}
+		}
 
-// 	go func() {
-// 		for {
-// 			data, ok := <-outputChannel
-// 			if !ok {
-// 				// `outputChannel` from hook closed, means we have to close connection
-// 				ws.Close()
-// 				helpers_RemoveRealtimePeer(ws)
-// 				return
-// 			}
+		fmt.Println("BBBBBBBB - END")
+		once.Do(closeInChannel)
+		wg.Done()
+	}()
 
-// 			err := ws.WriteMessage(websocket.TextMessage, data)
-// 			if err != nil {
-// 				// TRACE
-// 				// if false {
-// 				// log.Print("WebSocket-Write-Error:", err) // TODO: LOG
-// 				// }
+	go handler.Handler(inChannel, outChannel)
 
-// 				// we can't write means connection is closed, meaans we have to close chanels
-// 				once.Do(closeInputChannel)
-// 				return
-// 			}
-// 		}
-// 	}()
+	wg.Wait()
+	fmt.Println("thisRef.removePeer(ws)")
+	thisRef.removePeer(ws)
+}
 
-// 	go func() {
-// 		for {
-// 			_, data, err := ws.ReadMessage()
-// 			if err != nil {
-// 				// TRACE
-// 				// if false {
-// 				// log.Println("WebSocket-Read-Error: ", err) // TODO: LOG
-// 				// }
+// SendToAllPeers -
+func (thisRef *RealtimeServer) SendToAllPeers(data []byte) {
+	thisRef.peersSync.RLock()
+	defer thisRef.peersSync.RUnlock()
 
-// 				// we can't read means connection is closed, meaans we have to close chanels
-// 				once.Do(closeInputChannel)
-// 				return
-// 			}
+	for _, conn := range thisRef.peers {
+		conn.WriteMessage(websocket.TextMessage, data)
+	}
+}
 
-// 			inputChannel <- data
-// 		}
-// 	}()
+func (thisRef *RealtimeServer) addPeer(peer *websocket.Conn) {
+	thisRef.peersSync.Lock()
+	defer thisRef.peersSync.Unlock()
 
-// 	go handler.Handler(inputChannel, outputChannel) //, doneChannel)
-// }
+	thisRef.peers = append(thisRef.peers, peer)
+}
 
-// // func helpers_LowLevelRequestDelegate2(rw http.ResponseWriter, r *http.Request) {
-// // 	var handler JsonHandler = jsonRouteToHandler[r.URL.Path]
+func (thisRef *RealtimeServer) removePeer(peer *websocket.Conn) {
+	thisRef.peersSync.Lock()
+	defer thisRef.peersSync.Unlock()
 
-// // 	data, _ := ioutil.ReadAll(r.Body)
-// // 	dataAsString := string(data)
-// // 	println(dataAsString)
+	index := -1
+	for i, conn := range thisRef.peers {
+		if conn == peer {
+			index = i
+			break
+		}
+	}
+	if index != -1 {
+		thisRef.peers = append(thisRef.peers[:index], thisRef.peers[index+1:]...)
+	}
 
-// // 	var dataAsJson JsonData
-// // 	json.Unmarshal(data, &dataAsJson)
-
-// // 	var response JsonResponse = handler.Handler(dataAsJson)
-
-// // 	response.Data["error"] = response.Error
-// // 	responseAsByteArray, _ := json.Marshal(response.Data)
-
-// // 	rw.Write(responseAsByteArray)
-// // 	// json.NewEncoder(rw).Encode(responseAsByteArray)
-// // }
-
-// // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
-// // WS Client
-// // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
-
-// func NewRealtimeClient() *RealtimeClient {
-// 	return &RealtimeClient{
-// 		Address: "",
-// 		Peers:   []string{},
-// 	}
-// }
-
-// func (rtc *RealtimeClient) ConnectToPeer(url url.URL, realtimeHandler *RealtimeHandler) {
-// 	c, _, err := websocket.DefaultDialer.Dial(url.String(), nil)
-// 	if err != nil {
-// 		log.Fatal("dial:", err)
-// 	}
-
-// 	helpers_RealtimeCommunicationHandler(c, realtimeHandler)
-// }
-
-// // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
-// // JSON Helpers
-// // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
-// func (jsonData *JsonData) ToObject(objectInstance interface{}) {
-// 	// Do JSON to Object Mapping
-// 	objectValue := reflect.ValueOf(objectInstance).Elem()
-// 	for i := 0; i < objectValue.NumField(); i++ {
-// 		field := objectValue.Field(i)
-// 		fieldName := objectValue.Type().Field(i).Name
-
-// 		if valueToCopy, ok := (*jsonData)[fieldName]; ok {
-// 			if !field.CanInterface() {
-// 				continue
-// 			}
-// 			switch field.Interface().(type) {
-// 			case string:
-// 				valueToCopyAsString := reflect.ValueOf(valueToCopy).String()
-// 				objectValue.Field(i).SetString(valueToCopyAsString)
-// 				break
-// 			case int:
-// 				valueToCopyAsInt := int64(reflect.ValueOf(valueToCopy).Float())
-// 				objectValue.Field(i).SetInt(valueToCopyAsInt)
-// 				break
-// 			case float64:
-// 				valueToCopyAsFloat := reflect.ValueOf(valueToCopy).Float()
-// 				objectValue.Field(i).SetFloat(valueToCopyAsFloat)
-// 				break
-// 			default:
-// 			}
-// 		}
-// 	}
-// }
+	peer.Close()
+}
