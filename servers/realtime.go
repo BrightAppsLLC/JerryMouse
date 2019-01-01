@@ -20,12 +20,6 @@ type RealtimeHandler struct {
 	Handler RealtimeRequestHandler
 }
 
-// RealtimeClient -
-type RealtimeClient struct {
-	Address string
-	Peers   []string
-}
-
 // RealtimeServer -
 type RealtimeServer struct {
 	handlers       []RealtimeHandler
