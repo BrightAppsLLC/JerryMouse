@@ -42,15 +42,13 @@ func (thisRef *LowLevelServer) Run(ipPort string) error {
 		return err
 	}
 
-	thisRef.RunOnExistingListener(listener)
+	thisRef.RunOnExistingListenerAndRouter(listener, mux.NewRouter())
 
 	return nil
 }
 
-// RunOnExistingListener -
-func (thisRef *LowLevelServer) RunOnExistingListener(listener net.Listener) {
-	router := mux.NewRouter()
-
+// RunOnExistingListenerAndRouter -
+func (thisRef *LowLevelServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router) {
 	for _, handler := range thisRef.handlers {
 		router.HandleFunc(handler.Route, handler.Handler).Methods(handler.Verb)
 	}

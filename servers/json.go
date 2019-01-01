@@ -6,6 +6,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
 // JSONResponse -
@@ -79,9 +81,9 @@ func (thisRef *JSONServer) Run(ipPort string) error {
 	return thisRef.lowLevelServer.Run(ipPort)
 }
 
-// RunOnExistingListener -
-func (thisRef *JSONServer) RunOnExistingListener(listener net.Listener) {
-	thisRef.lowLevelServer.RunOnExistingListener(listener)
+// RunOnExistingListenerAndRouter -
+func (thisRef *JSONServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router) {
+	thisRef.lowLevelServer.RunOnExistingListenerAndRouter(listener, router)
 }
 
 // func (jsonData *JsonData) ToObject(objectInstance interface{}) {

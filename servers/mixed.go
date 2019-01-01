@@ -2,6 +2,9 @@ package servers
 
 import (
 	"net"
+	"sync"
+
+	"github.com/gorilla/mux"
 )
 
 // MixedServer -
@@ -23,16 +26,23 @@ func (thisRef *MixedServer) Run(ipPort string) error {
 		return err
 	}
 
-	for _, server := range thisRef.servers {
-		server.RunOnExistingListener(listener)
-	}
+	thisRef.RunOnExistingListenerAndRouter(listener, mux.NewRouter())
 
 	return nil
 }
 
-// RunOnExistingListener -
-func (thisRef *MixedServer) RunOnExistingListener(listener net.Listener) {
+// RunOnExistingListenerAndRouter -
+func (thisRef *MixedServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router) {
+	var wg sync.WaitGroup
+
 	for _, server := range thisRef.servers {
-		server.RunOnExistingListener(listener)
+		wg.Add(1)
+
+		go func(s IServer) {
+			s.RunOnExistingListenerAndRouter(listener, router)
+			wg.Done()
+		}(server)
 	}
+
+	wg.Wait()
 }

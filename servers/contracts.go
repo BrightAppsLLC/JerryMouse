@@ -3,12 +3,14 @@ package servers
 import (
 	"html/template"
 	"net"
+
+	"github.com/gorilla/mux"
 )
 
 // IServer -
 type IServer interface {
 	Run(ipPort string) error
-	RunOnExistingListener(listener net.Listener)
+	RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router)
 }
 
 // JSONData -

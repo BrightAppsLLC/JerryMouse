@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
 
@@ -82,9 +83,9 @@ func (thisRef *RealtimeServer) Run(ipPort string) error {
 	return thisRef.lowLevelServer.Run(ipPort)
 }
 
-// RunOnExistingListener -
-func (thisRef *RealtimeServer) RunOnExistingListener(listener net.Listener) {
-	thisRef.lowLevelServer.RunOnExistingListener(listener)
+// RunOnExistingListenerAndRouter -
+func (thisRef *RealtimeServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router) {
+	thisRef.lowLevelServer.RunOnExistingListenerAndRouter(listener, router)
 }
 
 func (thisRef *RealtimeServer) setupCommunication(ws *websocket.Conn, handler *RealtimeHandler) {
@@ -103,7 +104,7 @@ func (thisRef *RealtimeServer) setupCommunication(ws *websocket.Conn, handler *R
 	// outChannel -> PEER
 	wg.Add(1)
 	go func() {
-		fmt.Println("AAAAAAAA - START")
+		fmt.Println("SEND-TO-PEER - START")
 
 		for {
 			data, readOk := <-outChannel
@@ -117,15 +118,15 @@ func (thisRef *RealtimeServer) setupCommunication(ws *websocket.Conn, handler *R
 			}
 		}
 
-		fmt.Println("AAAAAAAA - END")
+		fmt.Println("SEND-TO-PEER - END")
 		once.Do(closeInChannel)
 		wg.Done()
 	}()
 
-	// PEER  -> inChannel
+	// PEER -> inChannel
 	wg.Add(1)
 	go func() {
-		fmt.Println("BBBBBBBB - START")
+		fmt.Println("READ-FROM-PEER - START")
 
 		for {
 			_, data, err := ws.ReadMessage()
@@ -146,7 +147,7 @@ func (thisRef *RealtimeServer) setupCommunication(ws *websocket.Conn, handler *R
 			}
 		}
 
-		fmt.Println("BBBBBBBB - END")
+		fmt.Println("READ-FROM-PEER - END")
 		once.Do(closeInChannel)
 		wg.Done()
 	}()
@@ -154,7 +155,7 @@ func (thisRef *RealtimeServer) setupCommunication(ws *websocket.Conn, handler *R
 	go handler.Handler(inChannel, outChannel)
 
 	wg.Wait()
-	fmt.Println("thisRef.removePeer(ws)")
+	fmt.Println("setupCommunication - DONE")
 	thisRef.removePeer(ws)
 }
 
