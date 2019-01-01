@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 
-	"github.com/brightappsllc/JerryMouse/Servers"
+	jmS "github.com/brightappsllc/JerryMouse/servers"
 )
 
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
@@ -29,38 +31,22 @@ type IncomingJson struct {
 	Field1 string
 	Field2 int
 	Field3 float64
-	Field4 string
+	Field4 bool
 }
 
-func jsonRequestHandler(data interface{}) Servers.JSONResponse {
-	dataAsJson, ok := data.(*IncomingJson)
-	if !ok {
-		return Servers.JSONResponse{
-			HasError: true,
-			ErrorMessage: "Invalid Params"
+func jsonRequestHandler(data []byte) jmS.JSONResponse {
+	var incomingJson = &IncomingJson{}
+
+	err := json.Unmarshal(data, incomingJson)
+	if err != nil {
+		return jmS.JSONResponse{
+			HasError:     true,
+			ErrorMessage: err.Error(),
 		}
 	}
 
 	// Input params seem ok, Process & Set Fields
-	var response Servers.JSONResponse
-	response.Data = dataAsJson
-
-	return response
-}
-
-func jsonRequestHandler2(data []byte) Servers.JSONResponse {
-	var incomingJson = IncomingJson{}
-
-	ok := json.Unmarshal(data, incomingJson)
-	if ok != nil {
-		return Servers.JSONResponse{
-			HasError: true,
-			ErrorMessage: "Invalid Params"
-		}
-	}
-
-	// Input params seem ok, Process & Set Fields
-	var response Servers.JSONResponse
+	var response jmS.JSONResponse
 	response.Data = incomingJson
 
 	return response
@@ -68,78 +54,101 @@ func jsonRequestHandler2(data []byte) Servers.JSONResponse {
 
 func streamTelemetryRequestHandler(inChannel chan []byte, outChannel chan []byte) { //, done chan bool) {
 	// DOX:
-	// `close(outChannel)` will close the connection
-	// if error when reading on `inChannel` means connection was closed, do not send data
+	//    To indicate DONE close the `outChannel`
+	//    If error when reading on `inChannel` means connection was closed, do not send data
 
+	var wg sync.WaitGroup
+	var rw sync.RWMutex
+	var outChannelClosed = false // writing to a closed channel will panic
+
+	wg.Add(1)
 	go func() {
 		for {
-			data, ok := <-inChannel
-			if !ok {
-				close(outChannel)
+			data, readOk := <-inChannel
+			if !readOk {
 				break
 			} else {
 				println("RECV: " + string(data))
 			}
 		}
+
+		rw.Lock()
+		outChannelClosed = true
+		close(outChannel)
+		rw.Unlock()
+
+		wg.Done()
 	}()
 
+	wg.Add(1)
 	go func() {
 		for {
 			time.Sleep(1 * time.Second)
 
 			dataToSend := "Async Hi From Server @ " + time.Now().Format(time.RFC3339)
 
-			select {
-			case outChannel <- []byte(dataToSend):
-				// message sent - all looks ok
-				println("SEND: " + dataToSend)
-			default:
-				// message not sent - connection was closed")
-				close(outChannel)
+			var haveToStop = false
+			rw.Lock()
+			if !outChannelClosed {
+				select {
+				case outChannel <- []byte(dataToSend):
+					println("SEND: " + dataToSend)
+				default:
+					haveToStop = true
+					break
+				}
+			} else {
+				haveToStop = true
+			}
+
+			if haveToStop {
 				break
 			}
+			rw.Unlock()
 		}
+
+		wg.Done()
 	}()
+
+	wg.Wait()
 }
 
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
 // Run Server
 // ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~ ~~~~
 func main() {
-	apiServer := Servers.Api()
+	const port = 9999
 
-	apiServer.SetLowLevelHandlers([]Servers.LowLevelHandler{
-		Servers.LowLevelHandler{
-			Route:   "/SayHello",
-			Handler: sayHelloRequestHandler,
-			Verb:    "GET",
-		},
-		Servers.LowLevelHandler{
-			Route:   "/EchoBack",
-			Handler: echoBackRequestHandler,
-			Verb:    "POST",
-		},
-	})
+	fmt.Println(fmt.Sprintf("curl localhost:%d/SayHello", port))
+	fmt.Println(fmt.Sprintf("curl localhost:%d/EchoBack -X POST -d 'should-send-back-the-same'", port))
+	fmt.Println(fmt.Sprintf("curl localhost:%d/MyRestEndopint -H \"Content-Type: application/json\" -X POST -d '{\"Field1\":\"val1\", \"Field2\": 0, \"Field3\": 1.0, \"Field4\": true}'", port))
+	fmt.Println("ALSO: open the 'sample.html' to see data streaming")
 
-	apiServer.SetJsonHandlers([]Servers.JsonHandler{
-		Servers.JsonHandler{
-			Route:      "/",
-			Handler:    jsonRequestHandler2,
-			JsonObject: &IncomingJson{},
-		},
-		Servers.JsonHandler{
-			Route:      "/MyRestEndopint",
-			Handler:    jsonRequestHandler2,
-			JsonObject: &IncomingJson{},
-		},
-	})
-
-	apiServer.SetRealtimeHandlers([]Servers.RealtimeHandler{
-		Servers.RealtimeHandler{
-			Route:   "/StreamTelemetry",
-			Handler: streamTelemetryRequestHandler,
-		},
-	})
-
-	apiServer.Run(":9999")
+	jmS.NewMixedServer([]jmS.IServer{
+		jmS.NewLowLevelServer(true, []jmS.LowLevelHandler{
+			jmS.LowLevelHandler{
+				Route:   "/SayHello",
+				Handler: sayHelloRequestHandler,
+				Verb:    "GET",
+			},
+			jmS.LowLevelHandler{
+				Route:   "/EchoBack",
+				Handler: echoBackRequestHandler,
+				Verb:    "POST",
+			},
+		}),
+		jmS.NewJSONServer(true, []jmS.JSONHandler{
+			jmS.JSONHandler{
+				Route:      "/MyRestEndopint",
+				Handler:    jsonRequestHandler,
+				JSONObject: &IncomingJson{},
+			},
+		}),
+		jmS.NewRealtimeServer(true, []jmS.RealtimeHandler{
+			jmS.RealtimeHandler{
+				Route:   "/StreamTelemetry",
+				Handler: streamTelemetryRequestHandler,
+			},
+		}),
+	}).Run(fmt.Sprintf(":%d", port))
 }
