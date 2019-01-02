@@ -8,6 +8,8 @@ import (
 
 // IServer -
 type IServer interface {
-	Run(ipPort string) error
-	RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router)
+	Run(ipPort string, enableCORS bool) error
+
+	PrepareRoutes(router *mux.Router)
+	RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool)
 }

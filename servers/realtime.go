@@ -30,7 +30,7 @@ type RealtimeServer struct {
 }
 
 // NewRealtimeServer -
-func NewRealtimeServer(enableCORS bool, handlers []RealtimeHandler) IServer {
+func NewRealtimeServer(handlers []RealtimeHandler) IServer {
 
 	var thisRef = &RealtimeServer{
 		handlers:       handlers,
@@ -67,19 +67,24 @@ func NewRealtimeServer(enableCORS bool, handlers []RealtimeHandler) IServer {
 		})
 	}
 
-	thisRef.lowLevelServer = NewLowLevelServer(enableCORS, lowLevelHandlers)
+	thisRef.lowLevelServer = NewLowLevelServer(lowLevelHandlers)
 
 	return thisRef
 }
 
 // Run -
-func (thisRef *RealtimeServer) Run(ipPort string) error {
-	return thisRef.lowLevelServer.Run(ipPort)
+func (thisRef *RealtimeServer) Run(ipPort string, enableCORS bool) error {
+	return thisRef.lowLevelServer.Run(ipPort, enableCORS)
+}
+
+// PrepareRoutes -
+func (thisRef *RealtimeServer) PrepareRoutes(router *mux.Router) {
+	thisRef.lowLevelServer.PrepareRoutes(router)
 }
 
 // RunOnExistingListenerAndRouter -
-func (thisRef *RealtimeServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router) {
-	thisRef.lowLevelServer.RunOnExistingListenerAndRouter(listener, router)
+func (thisRef *RealtimeServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
+	thisRef.lowLevelServer.RunOnExistingListenerAndRouter(listener, router, enableCORS)
 }
 
 func (thisRef *RealtimeServer) setupCommunication(ws *websocket.Conn, handler *RealtimeHandler) {

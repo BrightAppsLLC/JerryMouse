@@ -1,6 +1,7 @@
 package servers
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -22,38 +23,42 @@ type LowLevelHandler struct {
 // LowLevelServer -
 type LowLevelServer struct {
 	handlers       []LowLevelHandler
-	enableCORS     bool
 	routeToHandler map[string]RealtimeHandler
 }
 
 // NewLowLevelServer -
-func NewLowLevelServer(enableCORS bool, handlers []LowLevelHandler) IServer {
+func NewLowLevelServer(handlers []LowLevelHandler) IServer {
 	return &LowLevelServer{
 		handlers:       handlers,
-		enableCORS:     enableCORS,
 		routeToHandler: map[string]RealtimeHandler{},
 	}
 }
 
 // Run -
-func (thisRef *LowLevelServer) Run(ipPort string) error {
+func (thisRef *LowLevelServer) Run(ipPort string, enableCORS bool) error {
 	listener, err := net.Listen("tcp", ipPort)
 	if err != nil {
 		return err
 	}
 
-	thisRef.RunOnExistingListenerAndRouter(listener, mux.NewRouter())
+	var router = mux.NewRouter()
+	thisRef.PrepareRoutes(router)
+	thisRef.RunOnExistingListenerAndRouter(listener, router, enableCORS)
 
 	return nil
 }
 
-// RunOnExistingListenerAndRouter -
-func (thisRef *LowLevelServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router) {
+// PrepareRoutes -
+func (thisRef *LowLevelServer) PrepareRoutes(router *mux.Router) {
 	for _, handler := range thisRef.handlers {
+		fmt.Println(fmt.Sprintf("LLS: %s - for %s", handler.Route, handler.Verb))
 		router.HandleFunc(handler.Route, handler.Handler).Methods(handler.Verb)
 	}
+}
 
-	if thisRef.enableCORS {
+// RunOnExistingListenerAndRouter -
+func (thisRef *LowLevelServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
+	if enableCORS {
 		corsSetterHandler := cors.Default().Handler(router)
 		log.Fatal(http.Serve(listener, corsSetterHandler))
 	} else {

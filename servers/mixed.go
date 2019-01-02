@@ -1,10 +1,12 @@
 package servers
 
 import (
+	"log"
 	"net"
-	"sync"
+	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 )
 
 // MixedServer -
@@ -20,29 +22,45 @@ func NewMixedServer(servers []IServer) IServer {
 }
 
 // Run -
-func (thisRef *MixedServer) Run(ipPort string) error {
+func (thisRef *MixedServer) Run(ipPort string, enableCORS bool) error {
 	listener, err := net.Listen("tcp", ipPort)
 	if err != nil {
 		return err
 	}
 
-	thisRef.RunOnExistingListenerAndRouter(listener, mux.NewRouter())
+	var router = mux.NewRouter()
+	thisRef.PrepareRoutes(router)
+	thisRef.RunOnExistingListenerAndRouter(listener, router, enableCORS)
 
 	return nil
 }
 
-// RunOnExistingListenerAndRouter -
-func (thisRef *MixedServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router) {
-	var wg sync.WaitGroup
-
+// PrepareRoutes -
+func (thisRef *MixedServer) PrepareRoutes(router *mux.Router) {
 	for _, server := range thisRef.servers {
-		wg.Add(1)
+		server.PrepareRoutes(router)
+	}
+}
 
-		go func(s IServer) {
-			s.RunOnExistingListenerAndRouter(listener, router)
-			wg.Done()
-		}(server)
+// RunOnExistingListenerAndRouter -
+func (thisRef *MixedServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
+	if enableCORS {
+		corsSetterHandler := cors.Default().Handler(router)
+		log.Fatal(http.Serve(listener, corsSetterHandler))
+	} else {
+		log.Fatal(http.Serve(listener, router))
 	}
 
-	wg.Wait()
+	// var wg sync.WaitGroup
+
+	// for _, server := range thisRef.servers {
+	// 	wg.Add(1)
+
+	// 	go func(s IServer) {
+	// 		s.RunOnExistingListenerAndRouter(listener, router, enableCORS)
+	// 		wg.Done()
+	// 	}(server)
+	// }
+
+	// wg.Wait()
 }

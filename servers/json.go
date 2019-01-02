@@ -36,7 +36,7 @@ type JSONServer struct {
 }
 
 // NewJSONServer -
-func NewJSONServer(enableCORS bool, handlers []JSONHandler) *JSONServer {
+func NewJSONServer(handlers []JSONHandler) *JSONServer {
 
 	var thisRef = &JSONServer{
 		handlers:       handlers,
@@ -71,19 +71,24 @@ func NewJSONServer(enableCORS bool, handlers []JSONHandler) *JSONServer {
 		})
 	}
 
-	thisRef.lowLevelServer = NewLowLevelServer(enableCORS, lowLevelHandlers)
+	thisRef.lowLevelServer = NewLowLevelServer(lowLevelHandlers)
 
 	return thisRef
 }
 
 // Run - Server interface
-func (thisRef *JSONServer) Run(ipPort string) error {
-	return thisRef.lowLevelServer.Run(ipPort)
+func (thisRef *JSONServer) Run(ipPort string, enableCORS bool) error {
+	return thisRef.lowLevelServer.Run(ipPort, enableCORS)
+}
+
+// PrepareRoutes -
+func (thisRef *JSONServer) PrepareRoutes(router *mux.Router) {
+	thisRef.lowLevelServer.PrepareRoutes(router)
 }
 
 // RunOnExistingListenerAndRouter -
-func (thisRef *JSONServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router) {
-	thisRef.lowLevelServer.RunOnExistingListenerAndRouter(listener, router)
+func (thisRef *JSONServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
+	thisRef.lowLevelServer.RunOnExistingListenerAndRouter(listener, router, enableCORS)
 }
 
 // func (jsonData *JsonData) ToObject(objectInstance interface{}) {
