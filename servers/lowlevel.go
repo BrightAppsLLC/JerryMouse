@@ -22,15 +22,13 @@ type LowLevelHandler struct {
 
 // LowLevelServer -
 type LowLevelServer struct {
-	handlers       []LowLevelHandler
-	routeToHandler map[string]RealtimeHandler
+	handlers []LowLevelHandler
 }
 
 // NewLowLevelServer -
 func NewLowLevelServer(handlers []LowLevelHandler) IServer {
 	return &LowLevelServer{
-		handlers:       handlers,
-		routeToHandler: map[string]RealtimeHandler{},
+		handlers: handlers,
 	}
 }
 
