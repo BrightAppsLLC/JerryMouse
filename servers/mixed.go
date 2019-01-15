@@ -23,7 +23,7 @@ func NewMixedServer(servers []IServer) IServer {
 
 // Run -
 func (thisRef *MixedServer) Run(ipPort string, enableCORS bool) error {
-	listener, err := net.Listen("tcp", ipPort)
+	listener, err := net.Listen("tcp4", ipPort)
 	if err != nil {
 		return err
 	}

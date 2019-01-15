@@ -45,6 +45,8 @@ func NewJSONServer(handlers []JSONHandler) *JSONServer {
 	}
 
 	var lowLevelRequestHelper = func(rw http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
 		var jsonHandler = thisRef.routeToHandler[r.URL.Path]
 
 		// Pass Object
