@@ -13,7 +13,7 @@ import (
 // JSONResponse -
 type JSONResponse struct {
 	HasError     bool        `json:"hasError"`
-	ErrorMessage string      `json:"errorMessage,omitempty"`
+	ErrorMessage string      `json:"message,omitempty"`
 	Data         interface{} `json:"data,omitempty"`
 }
 
