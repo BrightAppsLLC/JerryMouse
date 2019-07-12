@@ -21,7 +21,7 @@ func NewMixedServer(servers []IServer) IServer {
 	}
 }
 
-// Run -
+// Run - Implement `IServer`
 func (thisRef *MixedServer) Run(ipPort string, enableCORS bool) error {
 	listener, err := net.Listen("tcp4", ipPort)
 	if err != nil {
@@ -35,14 +35,14 @@ func (thisRef *MixedServer) Run(ipPort string, enableCORS bool) error {
 	return nil
 }
 
-// PrepareRoutes -
+// PrepareRoutes - Implement `IServer`
 func (thisRef *MixedServer) PrepareRoutes(router *mux.Router) {
 	for _, server := range thisRef.servers {
 		server.PrepareRoutes(router)
 	}
 }
 
-// RunOnExistingListenerAndRouter -
+// RunOnExistingListenerAndRouter - Implement `IServer`
 func (thisRef *MixedServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
 	if enableCORS {
 		corsSetterHandler := cors.Default().Handler(router)

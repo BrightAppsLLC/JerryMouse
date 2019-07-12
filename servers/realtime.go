@@ -72,17 +72,17 @@ func NewRealtimeServer(handlers []RealtimeHandler) IServer {
 	return thisRef
 }
 
-// Run -
+// Run - Implement `IServer`
 func (thisRef *RealtimeServer) Run(ipPort string, enableCORS bool) error {
 	return thisRef.lowLevelServer.Run(ipPort, enableCORS)
 }
 
-// PrepareRoutes -
+// PrepareRoutes - Implement `IServer`
 func (thisRef *RealtimeServer) PrepareRoutes(router *mux.Router) {
 	thisRef.lowLevelServer.PrepareRoutes(router)
 }
 
-// RunOnExistingListenerAndRouter -
+// RunOnExistingListenerAndRouter - Implement `IServer`
 func (thisRef *RealtimeServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
 	thisRef.lowLevelServer.RunOnExistingListenerAndRouter(listener, router, enableCORS)
 }

@@ -78,17 +78,17 @@ func NewJSONServer(handlers []JSONHandler) *JSONServer {
 	return thisRef
 }
 
-// Run - Server interface
+// Run - Implement `IServer`
 func (thisRef *JSONServer) Run(ipPort string, enableCORS bool) error {
 	return thisRef.lowLevelServer.Run(ipPort, enableCORS)
 }
 
-// PrepareRoutes -
+// PrepareRoutes - Implement `IServer`
 func (thisRef *JSONServer) PrepareRoutes(router *mux.Router) {
 	thisRef.lowLevelServer.PrepareRoutes(router)
 }
 
-// RunOnExistingListenerAndRouter -
+// RunOnExistingListenerAndRouter - Implement `IServer`
 func (thisRef *JSONServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
 	thisRef.lowLevelServer.RunOnExistingListenerAndRouter(listener, router, enableCORS)
 }

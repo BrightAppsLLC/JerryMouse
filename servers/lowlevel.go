@@ -32,7 +32,7 @@ func NewLowLevelServer(handlers []LowLevelHandler) IServer {
 	}
 }
 
-// Run -
+// Run - Implement `IServer`
 func (thisRef *LowLevelServer) Run(ipPort string, enableCORS bool) error {
 	listener, err := net.Listen("tcp4", ipPort)
 	if err != nil {
@@ -46,15 +46,18 @@ func (thisRef *LowLevelServer) Run(ipPort string, enableCORS bool) error {
 	return nil
 }
 
-// PrepareRoutes -
+// PrepareRoutes - Implement `IServer`
 func (thisRef *LowLevelServer) PrepareRoutes(router *mux.Router) {
 	for _, handler := range thisRef.handlers {
 		fmt.Println(fmt.Sprintf("LLS: %s - for %s", handler.Route, handler.Verb))
-		router.HandleFunc(handler.Route, handler.Handler).Methods(handler.Verb)
+		router.
+			HandleFunc(handler.Route, handler.Handler).
+			Methods(handler.Verb).
+			Name(handler.Route)
 	}
 }
 
-// RunOnExistingListenerAndRouter -
+// RunOnExistingListenerAndRouter - Implement `IServer`
 func (thisRef *LowLevelServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
 	if enableCORS {
 		corsSetterHandler := cors.Default().Handler(router)
