@@ -11,31 +11,31 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// RealtimeRequestHandler -
-type RealtimeRequestHandler func(inChannel chan []byte, outChannel chan []byte)
+// WebScoketsRequestHandler -
+type WebScoketsRequestHandler func(inChannel chan []byte, outChannel chan []byte)
 
-// RealtimeHandler -
-type RealtimeHandler struct {
+// WebScoketsHandler -
+type WebScoketsHandler struct {
 	Route   string
-	Handler RealtimeRequestHandler
+	Handler WebScoketsRequestHandler
 }
 
-// RealtimeServer -
-type RealtimeServer struct {
-	handlers       []RealtimeHandler
-	routeToHandler map[string]RealtimeHandler
-	lowLevelServer IServer
+// WebScoketsServer -
+type WebScoketsServer struct {
+	handlers       []WebScoketsHandler
+	routeToHandler map[string]WebScoketsHandler
+	HTTPServer     IServer
 	peers          []*websocket.Conn
 	peersSync      sync.RWMutex
 }
 
-// NewRealtimeServer -
-func NewRealtimeServer(handlers []RealtimeHandler) IServer {
+// NewWebScoketsServer -
+func NewWebScoketsServer(handlers []WebScoketsHandler) IServer {
 
-	var thisRef = &RealtimeServer{
+	var thisRef = &WebScoketsServer{
 		handlers:       handlers,
-		routeToHandler: map[string]RealtimeHandler{},
-		lowLevelServer: nil,
+		routeToHandler: map[string]WebScoketsHandler{},
+		HTTPServer:     nil,
 		peers:          []*websocket.Conn{},
 		peersSync:      sync.RWMutex{},
 	}
@@ -43,7 +43,7 @@ func NewRealtimeServer(handlers []RealtimeHandler) IServer {
 	var lowLevelRequestHelper = func(rw http.ResponseWriter, r *http.Request) {
 		r.Header["Origin"] = nil
 
-		var handler RealtimeHandler = thisRef.routeToHandler[r.URL.Path]
+		var handler WebScoketsHandler = thisRef.routeToHandler[r.URL.Path]
 
 		var upgrader = websocket.Upgrader{}
 		ws, err := upgrader.Upgrade(rw, r, nil)
@@ -55,39 +55,39 @@ func NewRealtimeServer(handlers []RealtimeHandler) IServer {
 		thisRef.setupCommunication(ws, &handler)
 	}
 
-	var lowLevelHandlers = []LowLevelHandler{}
+	var HTTPHandlers = []HTTPHandler{}
 
 	for _, handler := range thisRef.handlers {
 		thisRef.routeToHandler[handler.Route] = handler
 
-		lowLevelHandlers = append(lowLevelHandlers, LowLevelHandler{
+		HTTPHandlers = append(HTTPHandlers, HTTPHandler{
 			Route:   handler.Route,
 			Handler: lowLevelRequestHelper,
 			Verb:    "GET",
 		})
 	}
 
-	thisRef.lowLevelServer = NewLowLevelServer(lowLevelHandlers)
+	thisRef.HTTPServer = NewHTTPServer(HTTPHandlers)
 
 	return thisRef
 }
 
 // Run - Implement `IServer`
-func (thisRef *RealtimeServer) Run(ipPort string, enableCORS bool) error {
-	return thisRef.lowLevelServer.Run(ipPort, enableCORS)
+func (thisRef *WebScoketsServer) Run(ipPort string, enableCORS bool) error {
+	return thisRef.HTTPServer.Run(ipPort, enableCORS)
 }
 
 // PrepareRoutes - Implement `IServer`
-func (thisRef *RealtimeServer) PrepareRoutes(router *mux.Router) {
-	thisRef.lowLevelServer.PrepareRoutes(router)
+func (thisRef *WebScoketsServer) PrepareRoutes(router *mux.Router) {
+	thisRef.HTTPServer.PrepareRoutes(router)
 }
 
 // RunOnExistingListenerAndRouter - Implement `IServer`
-func (thisRef *RealtimeServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
-	thisRef.lowLevelServer.RunOnExistingListenerAndRouter(listener, router, enableCORS)
+func (thisRef *WebScoketsServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
+	thisRef.HTTPServer.RunOnExistingListenerAndRouter(listener, router, enableCORS)
 }
 
-func (thisRef *RealtimeServer) setupCommunication(ws *websocket.Conn, handler *RealtimeHandler) {
+func (thisRef *WebScoketsServer) setupCommunication(ws *websocket.Conn, handler *WebScoketsHandler) {
 	thisRef.addPeer(ws)
 
 	var inChannel = make(chan []byte)
@@ -159,7 +159,7 @@ func (thisRef *RealtimeServer) setupCommunication(ws *websocket.Conn, handler *R
 }
 
 // SendToAllPeers -
-func (thisRef *RealtimeServer) SendToAllPeers(data []byte) {
+func (thisRef *WebScoketsServer) SendToAllPeers(data []byte) {
 	thisRef.peersSync.RLock()
 	defer thisRef.peersSync.RUnlock()
 
@@ -168,14 +168,14 @@ func (thisRef *RealtimeServer) SendToAllPeers(data []byte) {
 	}
 }
 
-func (thisRef *RealtimeServer) addPeer(peer *websocket.Conn) {
+func (thisRef *WebScoketsServer) addPeer(peer *websocket.Conn) {
 	thisRef.peersSync.Lock()
 	defer thisRef.peersSync.Unlock()
 
 	thisRef.peers = append(thisRef.peers, peer)
 }
 
-func (thisRef *RealtimeServer) removePeer(peer *websocket.Conn) {
+func (thisRef *WebScoketsServer) removePeer(peer *websocket.Conn) {
 	thisRef.peersSync.Lock()
 	defer thisRef.peersSync.Unlock()
 

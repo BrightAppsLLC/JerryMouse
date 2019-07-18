@@ -2,18 +2,20 @@ package servers
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/gorilla/mux"
+	"golang.org/x/crypto/ssh"
 
 	golog "github.com/brightappsllc/golog"
 	gologC "github.com/brightappsllc/golog/contracts"
 
 	reflectionHelpers "github.com/brightappsllc/gohelpers/reflection"
-
-	"github.com/gorilla/mux"
-	"golang.org/x/crypto/ssh"
 )
 
 // SSHTunnelServer -
@@ -57,15 +59,6 @@ func (thisRef *SSHTunnelServer) PrepareRoutes(router *mux.Router) {
 
 // RunOnExistingListenerAndRouter - Implement `IServer`
 func (thisRef *SSHTunnelServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
-	// if enableCORS {
-	// 	corsSetterHandler := cors.Default().Handler(router)
-	// 	log.Fatal(http.Serve(listener, corsSetterHandler))
-	// } else {
-	// 	log.Fatal(http.Serve(listener, router))
-	// }
-
-	// http.Serve(listener, router)
-
 	for {
 		connection, err := listener.Accept()
 		if err != nil {
@@ -81,13 +74,12 @@ func (thisRef *SSHTunnelServer) RunOnExistingListenerAndRouter(listener net.List
 	}
 }
 
-// CustomResponseWriter -
-type CustomResponseWriter struct {
+type customResponseWriter struct {
 	http.ResponseWriter
 	sshChannel ssh.Channel
 }
 
-func (thisRef *CustomResponseWriter) Write(data []byte) (int, error) {
+func (thisRef *customResponseWriter) Write(data []byte) (int, error) {
 
 	// golog.Instance().LogDebugWithFields(gologC.Fields{
 	// 	"method":  reflectionHelpers.GetThisFuncName(),
@@ -114,7 +106,7 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 		"message": fmt.Sprintf("SSHC-Conn %s", sshServerConnection.RemoteAddr().String()),
 	})
 
-	// golog.Instance().LogInfoWithFields(gologC.Fields{
+	// golog.Instance().LogDebugWithFields(gologC.Fields{
 	// 	"method":  reflectionHelpers.GetThisFuncName(),
 	// 	"message": fmt.Sprintf("logged in with key %s", sshServerConn.),
 	// })
@@ -137,30 +129,12 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 				"method":  reflectionHelpers.GetThisFuncName(),
 				"message": fmt.Sprintf("could not accept channel: %v", err),
 			})
-
 			break
 		}
-
-		// // Sessions have out-of-band requests such as "shell", "pty-req" and "env".
-		// // Here we handle only the "shell" request.
-		// go func(in <-chan *ssh.Request) {
-		// 	for req := range in {
-		// 		req.Reply(req.Type == "shell", nil)
-		// 	}
-		// }(requests)
-
-		// term := terminal.NewTerminal(channel, "> ")
 
 		go func() {
 			defer channel.Close()
 			for {
-				// line, err := term.ReadLine()
-				// term.
-				// if err != nil {
-				// 	break
-				// }
-				// fmt.Println(line)
-
 				data := make([]byte, 1000000)
 				len, err := channel.Read(data)
 				if err != nil {
@@ -169,43 +143,41 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 							"method":  reflectionHelpers.GetThisFuncName(),
 							"message": fmt.Sprintf("SSH-CONNECTION-CLOSED: %v", err),
 						})
-
 						break
 					} else {
 						golog.Instance().LogErrorWithFields(gologC.Fields{
 							"method":  reflectionHelpers.GetThisFuncName(),
 							"message": fmt.Sprintf("SSH-DATA-ERROR: %v", err),
 						})
-
 						break
 					}
 				}
 
 				data = data[0:len]
-
 				golog.Instance().LogDebugWithFields(gologC.Fields{
 					"method":  reflectionHelpers.GetThisFuncName(),
 					"message": fmt.Sprintf("SSH-DATA: %s", string(data)),
 				})
 
+				apiEndpoing := APIEndpoint{}
+				err = json.Unmarshal(data, &apiEndpoing)
+				if err != nil {
+					log.Fatal(err)
+				}
+
 				// Make `http.Request`
-				request, err := http.NewRequest("POST", "/TrasnferFile", bytes.NewBuffer(data))
+				request, err := http.NewRequest("POST", apiEndpoing.Value, bytes.NewBuffer(data))
 				if err != nil {
 					golog.Instance().LogErrorWithFields(gologC.Fields{
 						"method":  reflectionHelpers.GetThisFuncName(),
 						"message": fmt.Sprintf("SSH-DATA-ERROR: %v", err),
 					})
-
 					break
 				}
 
-				crw := &CustomResponseWriter{
-					sshChannel: channel,
-				}
-
-				route := thisRef.router.Get("/TrasnferFile")
+				route := thisRef.router.Get(apiEndpoing.Value)
 				if route != nil {
-					route.GetHandler().ServeHTTP(crw, request)
+					route.GetHandler().ServeHTTP(&customResponseWriter{sshChannel: channel}, request)
 					break
 				}
 			}

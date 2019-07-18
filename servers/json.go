@@ -2,12 +2,17 @@ package servers
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 
 	"github.com/gorilla/mux"
+
+	golog "github.com/brightappsllc/golog"
+	gologC "github.com/brightappsllc/golog/contracts"
+
+	reflectionHelpers "github.com/brightappsllc/gohelpers/reflection"
 )
 
 // JSONResponse -
@@ -18,30 +23,28 @@ type JSONResponse struct {
 }
 
 // JSONRequestHandler -
-//type JSONRequestHandler func(data interface{}) JsonResponse
 type JSONRequestHandler func(data []byte) JSONResponse
 
 // JSONHandler -
 type JSONHandler struct {
-	Route      string
-	Handler    JSONRequestHandler
-	JSONObject interface{}
+	Route    string
+	Template interface{}
+	Handler  JSONRequestHandler
 }
 
 // JSONServer -
 type JSONServer struct {
 	handlers       []JSONHandler
 	routeToHandler map[string]JSONHandler
-	lowLevelServer IServer
+	HTTPServer     IServer
 }
 
 // NewJSONServer -
 func NewJSONServer(handlers []JSONHandler) *JSONServer {
-
 	var thisRef = &JSONServer{
 		handlers:       handlers,
 		routeToHandler: map[string]JSONHandler{},
-		lowLevelServer: nil,
+		HTTPServer:     nil,
 	}
 
 	var lowLevelRequestHelper = func(rw http.ResponseWriter, r *http.Request) {
@@ -52,7 +55,11 @@ func NewJSONServer(handlers []JSONHandler) *JSONServer {
 		// Pass Object
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			log.Printf("Error reading body: %v", err)
+			golog.Instance().LogErrorWithFields(gologC.Fields{
+				"method":  reflectionHelpers.GetThisFuncName(),
+				"message": fmt.Sprintf("Error reading body: %v", err),
+			})
+
 			http.Error(rw, "can't read body", http.StatusBadRequest)
 			return
 		}
@@ -61,36 +68,36 @@ func NewJSONServer(handlers []JSONHandler) *JSONServer {
 		json.NewEncoder(rw).Encode(jsonResponse)
 	}
 
-	var lowLevelHandlers = []LowLevelHandler{}
+	var HTTPHandlers = []HTTPHandler{}
 
 	for _, handler := range thisRef.handlers {
 		thisRef.routeToHandler[handler.Route] = handler
 
-		lowLevelHandlers = append(lowLevelHandlers, LowLevelHandler{
+		HTTPHandlers = append(HTTPHandlers, HTTPHandler{
 			Route:   handler.Route,
 			Handler: lowLevelRequestHelper,
 			Verb:    "POST",
 		})
 	}
 
-	thisRef.lowLevelServer = NewLowLevelServer(lowLevelHandlers)
+	thisRef.HTTPServer = NewHTTPServer(HTTPHandlers)
 
 	return thisRef
 }
 
 // Run - Implement `IServer`
 func (thisRef *JSONServer) Run(ipPort string, enableCORS bool) error {
-	return thisRef.lowLevelServer.Run(ipPort, enableCORS)
+	return thisRef.HTTPServer.Run(ipPort, enableCORS)
 }
 
 // PrepareRoutes - Implement `IServer`
 func (thisRef *JSONServer) PrepareRoutes(router *mux.Router) {
-	thisRef.lowLevelServer.PrepareRoutes(router)
+	thisRef.HTTPServer.PrepareRoutes(router)
 }
 
 // RunOnExistingListenerAndRouter - Implement `IServer`
 func (thisRef *JSONServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
-	thisRef.lowLevelServer.RunOnExistingListenerAndRouter(listener, router, enableCORS)
+	thisRef.HTTPServer.RunOnExistingListenerAndRouter(listener, router, enableCORS)
 }
 
 // func (jsonData *JsonData) ToObject(objectInstance interface{}) {
@@ -133,7 +140,7 @@ func (thisRef *JSONServer) RunOnExistingListenerAndRouter(listener net.Listener,
 // 	fmt.Println(fmt.Sprintf("%s -> %s", Utils.CallStack(), string(reqAsJSON)))
 // }
 
-//jsonData.ToObject(jsonHandler.JsonObject)
+//jsonData.ToObject(jsonHandler.Template)
 
 // Pass Object
 //var response JsonResponse = jsonHandler.Handler(jsonData)

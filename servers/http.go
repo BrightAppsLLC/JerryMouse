@@ -1,6 +1,7 @@
 package servers
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -8,31 +9,42 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 
-	reflectionHelpers "github.com/brightappsllc/gohelpers/reflection"
 	golog "github.com/brightappsllc/golog"
 	gologC "github.com/brightappsllc/golog/contracts"
+
+	reflectionHelpers "github.com/brightappsllc/gohelpers/reflection"
 )
 
-// MixedServer -
-type MixedServer struct {
-	servers []IServer
+// HTTPRequestHandler -
+type HTTPRequestHandler func(rw http.ResponseWriter, r *http.Request)
+
+// HTTPHandler -
+type HTTPHandler struct {
+	Route   string
+	Verb    string
+	Handler HTTPRequestHandler
 }
 
-// NewMixedServer -
-func NewMixedServer(servers []IServer) IServer {
-	return &MixedServer{
-		servers: servers,
+// HTTPServer -
+type HTTPServer struct {
+	handlers []HTTPHandler
+}
+
+// NewHTTPServer -
+func NewHTTPServer(handlers []HTTPHandler) IServer {
+	return &HTTPServer{
+		handlers: handlers,
 	}
 }
 
 // Run - Implement `IServer`
-func (thisRef *MixedServer) Run(ipPort string, enableCORS bool) error {
+func (thisRef *HTTPServer) Run(ipPort string, enableCORS bool) error {
 	listener, err := net.Listen("tcp4", ipPort)
 	if err != nil {
 		return err
 	}
 
-	var router = mux.NewRouter()
+	router := mux.NewRouter()
 	thisRef.PrepareRoutes(router)
 	thisRef.RunOnExistingListenerAndRouter(listener, router, enableCORS)
 
@@ -40,14 +52,19 @@ func (thisRef *MixedServer) Run(ipPort string, enableCORS bool) error {
 }
 
 // PrepareRoutes - Implement `IServer`
-func (thisRef *MixedServer) PrepareRoutes(router *mux.Router) {
-	for _, server := range thisRef.servers {
-		server.PrepareRoutes(router)
+func (thisRef *HTTPServer) PrepareRoutes(router *mux.Router) {
+	for _, handler := range thisRef.handlers {
+		golog.Instance().LogDebugWithFields(gologC.Fields{
+			"method":  reflectionHelpers.GetThisFuncName(),
+			"message": fmt.Sprintf("%s - for %s", handler.Route, handler.Verb),
+		})
+
+		router.HandleFunc(handler.Route, handler.Handler).Methods(handler.Verb).Name(handler.Route)
 	}
 }
 
 // RunOnExistingListenerAndRouter - Implement `IServer`
-func (thisRef *MixedServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
+func (thisRef *HTTPServer) RunOnExistingListenerAndRouter(listener net.Listener, router *mux.Router, enableCORS bool) {
 	if enableCORS {
 		corsSetterHandler := cors.Default().Handler(router)
 		err := http.Serve(listener, corsSetterHandler)
