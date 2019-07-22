@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -64,7 +63,7 @@ func (thisRef *SSHTunnelServer) RunOnExistingListenerAndRouter(listener net.List
 		if err != nil {
 			golog.Instance().LogErrorWithFields(gologC.Fields{
 				"method":  reflectionHelpers.GetThisFuncName(),
-				"message": fmt.Sprintf("failed to accept incoming connection: %s", err),
+				"message": fmt.Sprintf("JM-SSH: failed to accept incoming connection: %s", err),
 			})
 
 			continue
@@ -95,7 +94,7 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 	if err != nil {
 		golog.Instance().LogErrorWithFields(gologC.Fields{
 			"method":  reflectionHelpers.GetThisFuncName(),
-			"message": fmt.Sprintf("failed to handshake: %s", err),
+			"message": fmt.Sprintf("JM-SSH: failed to handshake: %s", err),
 		})
 
 		return
@@ -103,7 +102,7 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 
 	golog.Instance().LogInfoWithFields(gologC.Fields{
 		"method":  reflectionHelpers.GetThisFuncName(),
-		"message": fmt.Sprintf("SSHC-Conn %s", sshServerConnection.RemoteAddr().String()),
+		"message": fmt.Sprintf("JM-SSH: Connection %s", sshServerConnection.RemoteAddr().String()),
 	})
 
 	// golog.Instance().LogDebugWithFields(gologC.Fields{
@@ -127,7 +126,7 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 		if err != nil {
 			golog.Instance().LogErrorWithFields(gologC.Fields{
 				"method":  reflectionHelpers.GetThisFuncName(),
-				"message": fmt.Sprintf("could not accept channel: %v", err),
+				"message": fmt.Sprintf("JM-SSH: could not accept channel: %v", err),
 			})
 			break
 		}
@@ -147,7 +146,7 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 					} else {
 						golog.Instance().LogErrorWithFields(gologC.Fields{
 							"method":  reflectionHelpers.GetThisFuncName(),
-							"message": fmt.Sprintf("SSH-DATA-ERROR: %v", err),
+							"message": fmt.Sprintf("JM-SSH: SSH-DATA-ERROR: %v", err),
 						})
 						break
 					}
@@ -156,30 +155,44 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 				data = data[0:len]
 				golog.Instance().LogDebugWithFields(gologC.Fields{
 					"method":  reflectionHelpers.GetThisFuncName(),
-					"message": fmt.Sprintf("SSH-DATA: %s", string(data)),
+					"message": fmt.Sprintf("JM-SSH: SSH-DATA: %s", string(data)),
 				})
 
 				apiEndpoing := APIEndpoint{}
 				err = json.Unmarshal(data, &apiEndpoing)
 				if err != nil {
-					log.Fatal(err)
+					golog.Instance().LogErrorWithFields(gologC.Fields{
+						"method":  reflectionHelpers.GetThisFuncName(),
+						"message": fmt.Sprintf("JM-SSH: Missing ROUTE: %s", err.Error()),
+					})
 				}
+
+				golog.Instance().LogDebugWithFields(gologC.Fields{
+					"method":  reflectionHelpers.GetThisFuncName(),
+					"message": fmt.Sprintf("JM-SSH: SSH-DATA: %s", string(data)),
+				})
 
 				// Make `http.Request`
 				request, err := http.NewRequest("POST", apiEndpoing.Value, bytes.NewBuffer(data))
 				if err != nil {
 					golog.Instance().LogErrorWithFields(gologC.Fields{
 						"method":  reflectionHelpers.GetThisFuncName(),
-						"message": fmt.Sprintf("SSH-DATA-ERROR: %v", err),
+						"message": fmt.Sprintf("JM-SSH: SSH-DATA-ERROR: %s", err.Error()),
 					})
 					break
 				}
 
 				route := thisRef.router.Get(apiEndpoing.Value)
-				if route != nil {
-					route.GetHandler().ServeHTTP(&customResponseWriter{sshChannel: channel}, request)
+				if route == nil {
+					golog.Instance().LogErrorWithFields(gologC.Fields{
+						"method":  reflectionHelpers.GetThisFuncName(),
+						"message": fmt.Sprintf("JM-SSH: Missing ROUTE: %s", apiEndpoing.Value),
+					})
 					break
 				}
+
+				route.GetHandler().ServeHTTP(&customResponseWriter{sshChannel: channel}, request)
+				break
 			}
 		}()
 	}
