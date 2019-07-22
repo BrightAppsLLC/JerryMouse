@@ -140,13 +140,13 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 					if strings.Compare(err.Error(), "EOF") == 0 {
 						golog.Instance().LogInfoWithFields(gologC.Fields{
 							"method":  reflectionHelpers.GetThisFuncName(),
-							"message": fmt.Sprintf("SSH-CONNECTION-CLOSED: %v", err),
+							"message": fmt.Sprintf("JM-SSH: CONNECTION-CLOSED: %v", err),
 						})
 						break
 					} else {
 						golog.Instance().LogErrorWithFields(gologC.Fields{
 							"method":  reflectionHelpers.GetThisFuncName(),
-							"message": fmt.Sprintf("JM-SSH: SSH-DATA-ERROR: %v", err),
+							"message": fmt.Sprintf("JM-SSH: DATA-ERROR: %v", err),
 						})
 						break
 					}
