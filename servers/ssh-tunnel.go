@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/brightappsllc/baqe-crypto/ssh"
 	"github.com/gorilla/mux"
-	"golang.org/x/crypto/ssh"
 
 	golog "github.com/brightappsllc/golog"
 	gologC "github.com/brightappsllc/golog/contracts"
@@ -37,7 +37,7 @@ func NewSSHTunnelServer(sshServerConfig *ssh.ServerConfig, server IServer) IServ
 func (thisRef *SSHTunnelServer) Run(ipPort string, enableCORS bool) error {
 
 	//
-	// BASED-ON: https://godoc.org/golang.org/x/crypto/ssh#example-NewServerConn
+	// BASED-ON: https://godoc.org/github.com/brightappsllc/baqe-crypto/ssh#example-NewServerConn
 	//
 
 	listener, err := net.Listen("tcp4", ipPort)
