@@ -17,9 +17,9 @@ import (
 
 // JSONResponse -
 type JSONResponse struct {
-	HasError     bool        `json:"hasError"`
-	ErrorMessage string      `json:"message,omitempty"`
-	Data         interface{} `json:"data,omitempty"`
+	HasError bool        `json:"hasError"`
+	Message  string      `json:"message,omitempty"`
+	Data     interface{} `json:"data,omitempty"`
 }
 
 // JSONRequestHandler -

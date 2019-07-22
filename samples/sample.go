@@ -40,8 +40,8 @@ func jsonRequestHandler(data []byte) jmS.JSONResponse {
 	err := json.Unmarshal(data, incomingJson)
 	if err != nil {
 		return jmS.JSONResponse{
-			HasError:     true,
-			ErrorMessage: err.Error(),
+			HasError: true,
+			Message:  err.Error(),
 		}
 	}
 
