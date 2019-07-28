@@ -79,11 +79,10 @@ type customResponseWriter struct {
 }
 
 func (thisRef *customResponseWriter) Write(data []byte) (int, error) {
-
-	// golog.Instance().LogDebugWithFields(gologC.Fields{
-	// 	"method":  reflectionHelpers.GetThisFuncName(),
-	// 	"message": string(data),
-	// })
+	golog.Instance().LogTraceWithFields(gologC.Fields{
+		"method":  reflectionHelpers.GetThisFuncName(),
+		"message": fmt.Sprintf("JM-SSH: sending back %d bytes", len(data)),
+	})
 
 	return thisRef.sshChannel.Write(data)
 }
@@ -105,24 +104,17 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 		"message": fmt.Sprintf("JM-SSH: Connection %s", sshServerConnection.RemoteAddr().String()),
 	})
 
-	// golog.Instance().LogDebugWithFields(gologC.Fields{
-	// 	"method":  reflectionHelpers.GetThisFuncName(),
-	// 	"message": fmt.Sprintf("logged in with key %s", sshServerConn.),
-	// })
-
 	// The incoming Request channel must be serviced.
 	go ssh.DiscardRequests(reqs)
 
 	// Service the incoming Channel channel.
 	for newChannel := range chans {
-		// Channels have a type, depending on the application level protocol intended.
-		// In the case of a shell, the type is "session" and ServerShell may be used
-		// to present a simple terminal interface.
 		if newChannel.ChannelType() != "session" {
 			newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
 			continue
 		}
-		channel, _, err := newChannel.Accept() // requests
+
+		channel, _, err := newChannel.Accept()
 		if err != nil {
 			golog.Instance().LogErrorWithFields(gologC.Fields{
 				"method":  reflectionHelpers.GetThisFuncName(),
@@ -131,16 +123,22 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 			break
 		}
 
-		go func() {
-			defer channel.Close()
+		go func(ch ssh.Channel) {
+			golog.Instance().LogTraceWithFields(gologC.Fields{
+				"method":  reflectionHelpers.GetThisFuncName(),
+				"message": fmt.Sprintf("JM-SSH: newChannel.Accept()"),
+			})
+
+			defer ch.Close()
+
 			for {
 				data := make([]byte, 1000000)
-				len, err := channel.Read(data)
+				len, err := ch.Read(data)
 				if err != nil {
 					if strings.Compare(err.Error(), "EOF") == 0 {
 						golog.Instance().LogInfoWithFields(gologC.Fields{
 							"method":  reflectionHelpers.GetThisFuncName(),
-							"message": fmt.Sprintf("JM-SSH: CONNECTION-CLOSED: %v", err),
+							"message": fmt.Sprintf("JM-SSH: TRANSFER-FINISHED: %v", err),
 						})
 						break
 					} else {
@@ -155,7 +153,7 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 				data = data[0:len]
 				golog.Instance().LogDebugWithFields(gologC.Fields{
 					"method":  reflectionHelpers.GetThisFuncName(),
-					"message": fmt.Sprintf("JM-SSH: SSH-DATA: %s", string(data)),
+					"message": fmt.Sprintf("JM-SSH: DATA-TO-PASS-ON: %s", string(data)),
 				})
 
 				apiEndpoing := APIEndpoint{}
@@ -166,11 +164,6 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 						"message": fmt.Sprintf("JM-SSH: Missing ROUTE: %s", err.Error()),
 					})
 				}
-
-				golog.Instance().LogDebugWithFields(gologC.Fields{
-					"method":  reflectionHelpers.GetThisFuncName(),
-					"message": fmt.Sprintf("JM-SSH: SSH-DATA: %s", string(data)),
-				})
 
 				// Make `http.Request`
 				request, err := http.NewRequest("POST", apiEndpoing.Value, bytes.NewBuffer(data))
@@ -191,9 +184,14 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 					break
 				}
 
-				route.GetHandler().ServeHTTP(&customResponseWriter{sshChannel: channel}, request)
+				golog.Instance().LogTraceWithFields(gologC.Fields{
+					"method":  reflectionHelpers.GetThisFuncName(),
+					"message": fmt.Sprintf("JM-SSH: ServeHTTP()"),
+				})
+				route.GetHandler().ServeHTTP(&customResponseWriter{sshChannel: ch}, request)
+
 				break
 			}
-		}()
+		}(channel)
 	}
 }
