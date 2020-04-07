@@ -15,6 +15,7 @@ import (
 	gologC "github.com/brightappsllc/golog/contracts"
 
 	reflectionHelpers "github.com/brightappsllc/gohelpers/reflection"
+	"runtime/debug"
 )
 
 // SSHTunnelServer -
@@ -65,6 +66,7 @@ func (thisRef *SSHTunnelServer) RunOnExistingListenerAndRouter(listener net.List
 				"method":  reflectionHelpers.GetThisFuncName(),
 				"message": fmt.Sprintf("JM-SSH: failed to accept incoming connection: %s", err),
 			})
+			debug.PrintStack()
 
 			continue
 		}
@@ -95,7 +97,7 @@ func (thisRef *SSHTunnelServer) runSSH(connection net.Conn) {
 			"method":  reflectionHelpers.GetThisFuncName(),
 			"message": fmt.Sprintf("JM-SSH: failed to handshake: %s", err),
 		})
-
+		debug.PrintStack()
 		return
 	}
 
