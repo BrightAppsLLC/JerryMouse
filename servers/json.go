@@ -64,7 +64,8 @@ func NewJSONServer(handlers []JSONHandler) *JSONServer {
 			return
 		}
 
-		var jsonResponse = jsonHandler.Handler(body)
+		var jsonResponse = jsonHandler.Handler(body
+		rw.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(rw).Encode(jsonResponse)
 	}
 
