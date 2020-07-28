@@ -125,7 +125,7 @@ func main() {
 	fmt.Println("ALSO: open the 'sample.html' to see data streaming")
 
 	jmS.NewMixedServer([]jmS.IServer{
-		jmS.NewHTTPServer(true, []jmS.HTTPHandler{
+		jmS.NewHTTPServer([]jmS.HTTPHandler{
 			jmS.HTTPHandler{
 				Route:   "/SayHello",
 				Verb:    "GET",
@@ -137,18 +137,18 @@ func main() {
 				Handler: echoBackRequestHandler,
 			},
 		}),
-		jmS.NewJSONServer(true, []jmS.JSONHandler{
+		jmS.NewJSONServer([]jmS.JSONHandler{
 			jmS.JSONHandler{
 				Route:    "/MyRestEndopint",
 				Template: &IncomingJson{},
 				Handler:  jsonRequestHandler,
 			},
 		}),
-		jmS.NewWebScoketsServer(true, []jmS.WebScoketsHandler{
+		jmS.NewWebScoketsServer([]jmS.WebScoketsHandler{
 			jmS.WebScoketsHandler{
 				Route:   "/StreamTelemetry",
 				Handler: streamTelemetryRequestHandler,
 			},
 		}),
-	}).Run(fmt.Sprintf(":%d", port))
+	}).Run(fmt.Sprintf(":%d", port), true)
 }

@@ -1,9 +1,8 @@
 package servers
 
 import (
-	"net"
-
 	"github.com/gorilla/mux"
+	"net"
 )
 
 // IServer -
