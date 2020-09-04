@@ -126,19 +126,19 @@ func main() {
 
 	jmS.NewMixedServer([]jmS.IServer{
 		jmS.NewHTTPServer([]jmS.HTTPHandler{
-			jmS.HTTPHandler{
+			{
 				Route:   "/SayHello",
 				Verb:    "GET",
 				Handler: sayHelloRequestHandler,
 			},
-			jmS.HTTPHandler{
+			{
 				Route:   "/EchoBack",
 				Verb:    "POST",
 				Handler: echoBackRequestHandler,
 			},
 		}),
 		jmS.NewJSONServer([]jmS.JSONHandler{
-			jmS.JSONHandler{
+			{
 				Route:    "/MyRestEndopint",
 				Template: &IncomingJson{},
 				Handler:  jsonRequestHandler,
@@ -150,5 +150,5 @@ func main() {
 				Handler: streamTelemetryRequestHandler,
 			},
 		}),
-	}).Run(fmt.Sprintf(":%d", port), true)
+	}).Run(fmt.Sprintf(":%d", port), false)
 }

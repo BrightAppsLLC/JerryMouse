@@ -4,15 +4,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
-
-	golog "github.com/brightappsllc/golog"
-	gologC "github.com/brightappsllc/golog/contracts"
-
-	reflectionHelpers "github.com/brightappsllc/gohelpers/reflection"
+	log "github.com/sirupsen/logrus"
 )
 
 // HTTPRequestHandler -
@@ -54,11 +49,7 @@ func (thisRef *HTTPServer) Run(ipPort string, enableCORS bool) error {
 // PrepareRoutes - Implement `IServer`
 func (thisRef *HTTPServer) PrepareRoutes(router *mux.Router) {
 	for _, handler := range thisRef.handlers {
-		golog.Instance().LogDebugWithFields(gologC.Fields{
-			"method":  reflectionHelpers.GetThisFuncName(),
-			"message": fmt.Sprintf("%s - for %s", handler.Route, handler.Verb),
-		})
-
+		log.Debug(fmt.Sprintf("%s - for %s", handler.Route, handler.Verb))
 		router.HandleFunc(handler.Route, handler.Handler).Methods(handler.Verb).Name(handler.Route)
 	}
 }
@@ -69,22 +60,12 @@ func (thisRef *HTTPServer) RunOnExistingListenerAndRouter(listener net.Listener,
 		corsSetterHandler := cors.Default().Handler(router)
 		err := http.Serve(listener, corsSetterHandler)
 		if err != nil {
-			golog.Instance().LogFatalWithFields(gologC.Fields{
-				"method":  reflectionHelpers.GetThisFuncName(),
-				"message": err.Error(),
-			})
-
-			os.Exit(-1)
+			log.Fatal(err.Error())
 		}
 	} else {
 		err := http.Serve(listener, router)
 		if err != nil {
-			golog.Instance().LogFatalWithFields(gologC.Fields{
-				"method":  reflectionHelpers.GetThisFuncName(),
-				"message": err.Error(),
-			})
-
-			os.Exit(-1)
+			log.Fatal(err)
 		}
 	}
 }

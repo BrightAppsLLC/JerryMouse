@@ -3,14 +3,10 @@ package servers
 import (
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
-
-	reflectionHelpers "github.com/brightappsllc/gohelpers/reflection"
-	golog "github.com/brightappsllc/golog"
-	gologC "github.com/brightappsllc/golog/contracts"
+	log "github.com/sirupsen/logrus"
 )
 
 // MixedServer -
@@ -52,22 +48,12 @@ func (thisRef *MixedServer) RunOnExistingListenerAndRouter(listener net.Listener
 		corsSetterHandler := cors.Default().Handler(router)
 		err := http.Serve(listener, corsSetterHandler)
 		if err != nil {
-			golog.Instance().LogFatalWithFields(gologC.Fields{
-				"method":  reflectionHelpers.GetThisFuncName(),
-				"message": err.Error(),
-			})
-
-			os.Exit(-1)
+			log.Fatal(err)
 		}
 	} else {
 		err := http.Serve(listener, router)
 		if err != nil {
-			golog.Instance().LogFatalWithFields(gologC.Fields{
-				"method":  reflectionHelpers.GetThisFuncName(),
-				"message": err.Error(),
-			})
-
-			os.Exit(-1)
+			log.Fatal(err)
 		}
 	}
 }

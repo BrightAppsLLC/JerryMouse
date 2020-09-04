@@ -2,17 +2,11 @@ package servers
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 
 	"github.com/gorilla/mux"
-
-	golog "github.com/brightappsllc/golog"
-	gologC "github.com/brightappsllc/golog/contracts"
-
-	reflectionHelpers "github.com/brightappsllc/gohelpers/reflection"
 )
 
 // JSONResponse -
@@ -55,11 +49,6 @@ func NewJSONServer(handlers []JSONHandler) *JSONServer {
 		// Pass Object
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			golog.Instance().LogErrorWithFields(gologC.Fields{
-				"method":  reflectionHelpers.GetThisFuncName(),
-				"message": fmt.Sprintf("Error reading body: %v", err),
-			})
-
 			http.Error(rw, "can't read body", http.StatusBadRequest)
 			return
 		}
