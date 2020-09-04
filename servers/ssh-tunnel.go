@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"runtime/debug"
 	"strings"
 
-	"github.com/brightappsllc/baqe-crypto/ssh"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ssh"
 )
 
 // SSHTunnelServer -
@@ -33,11 +33,6 @@ func NewSSHTunnelServer(sshServerConfig *ssh.ServerConfig, server IServer) IServ
 
 // Run - Implement `IServer`
 func (thisRef *SSHTunnelServer) Run(ipPort string, enableCORS bool) error {
-
-	//
-	// BASED-ON: https://godoc.org/github.com/brightappsllc/baqe-crypto/ssh#example-NewServerConn
-	//
-
 	listener, err := net.Listen("tcp4", ipPort)
 	if err != nil {
 		return err

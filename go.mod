@@ -3,11 +3,10 @@ module github.com/brightappsllc/JerryMouse
 go 1.14
 
 require (
-	github.com/brightappsllc/gohelpers v0.0.0-20190729084224-e8c40ee919a8
-	github.com/brightappsllc/golog v0.0.0-20190828053451-11beca4e085d
-	github.com/gorilla/mux v1.7.4
+	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
-	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/rs/cors v1.7.0
-	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899
+	github.com/sirupsen/logrus v1.6.0
+	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
+	golang.org/x/sys v0.0.0-20200831180312-196b9ba8737a // indirect
 )
