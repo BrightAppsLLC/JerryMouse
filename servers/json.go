@@ -16,6 +16,15 @@ type JSONResponse struct {
 	Data     interface{} `json:"data,omitempty"`
 }
 
+func NewResponse(data interface{}, err string) JSONResponse {
+	return JSONResponse{
+		HasError: err != "",
+		Message:  err,
+		Data:     data,
+	}
+}
+
+
 // JSONRequestHandler -
 type JSONRequestHandler func(data []byte) JSONResponse
 
